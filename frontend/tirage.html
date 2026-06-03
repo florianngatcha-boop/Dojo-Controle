@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DojoControl - Tableaux & Tirages</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+  <style>
+    :root {
+      --color-primary: #004085; --color-accent: #3b82f6; --color-success: #10b981;
+      --color-danger: #ef4444; --color-bg: #F4F7FA;
+      --color-card: #FFFFFF; --color-text: #0F172A; --color-border: #CBD5E1;
+    }
+    * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+    body { background-color: var(--color-bg); color: var(--color-text); margin: 0; padding: 0; }
+
+    .navbar { background: var(--color-primary); color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .navbar h1 { margin: 0; font-size: 20px; display: flex; align-items: center; gap: 10px; }
+
+    .container { max-width: 1400px; margin: 2rem auto; padding: 0 1rem; }
+
+    .control-panel { background: var(--color-card); border: 1px solid var(--color-border); border-radius: 8px; padding: 1.5rem; margin-bottom: 2rem; }
+    .control-panel { display: flex; gap: 20px; align-items: flex-end; flex-wrap: wrap; }
+    .select-group { display: flex; flex-direction: column; gap: 6px; }
+    .select-group label { font-size: 12px; font-weight: 700; color: #64748B; text-transform: uppercase; }
+    select { padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 6px; font-size: 14px; background: white; font-weight: 600; outline: none; }
+
+    .btn { background: var(--color-accent); color: white; border: none; padding: 10px 18px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .btn:hover { background: #2563EB; }
+
+    .bracket-viewport { overflow-x: auto; padding: 2rem 1rem; background: #FFFFFF; border-radius: 8px; border: 1px solid var(--color-border); min-height: 400px; margin-bottom: 2rem; }
+    .bracket-wrapper { display: flex; gap: 60px; align-items: center; justify-content: flex-start; min-width: max-content; }
+    
+    .round-column { display: flex; flex-direction: column; justify-content: space-around; gap: 24px; min-width: 280px; }
+    .round-title { font-size: 12px; font-weight: 800; text-transform: uppercase; color: var(--color-primary); text-align: center; margin-bottom: 10px; }
+
+    .match-card { background: #FFFFFF; border: 1px solid var(--color-border); border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.04); padding: 4px; position: relative; cursor: pointer; transition: all 0.2s; }
+    .match-card:hover { border-color: var(--color-accent); transform: translateY(-3px); }
+
+    .fighter-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-radius: 4px; font-size: 13px; font-weight: 700; margin: 2px 0; color: #1E293B; }
+    .fighter-row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+    .fighter-row .score { background: #F1F5F9; color: #0F172A; font-weight: 800; padding: 2px 6px; border-radius: 4px; font-size: 12px; min-width: 35px; text-align: center; }
+    .fighter-row.winner { background: #F0FDF4; color: #065F46; }
+    .fighter-row.winner .score { background: #10B981; color: white; }
+
+    .empty-state { text-align: center; padding: 5rem 0; color: #64748B; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <h1><i class="ti ti-tournament"></i> DojoControl — Tableaux Officiels</h1>
+</nav>
+
+<div class="container">
+
+  <div class="control-panel">
+    <div class="select-group">
+      <label for="category-selector">Catégorie</label>
+      <select id="category-selector" onchange="chargerTableauDeLaCategorie()">
+        <option value="">-- Choisir une catégorie --</option>
+      </select>
+    </div>
+
+    <button class="btn" onclick="genererNouveauTirageAuSort()">
+      <i class="ti ti-dice-5"></i> Générer le Tirage
+    </button>
+    
+    <button class="btn" style="background: #F1F5F9; color: #475569;" onclick="reinitialiserCategorieCourante()">
+      <i class="ti ti-refresh"></i> Réinitialiser
+    </button>
+  </div>
+
+  <div class="bracket-viewport" id="bracket-viewport">
+    <div class="empty-state">
+      <i class="ti ti-sitemap"></i>
+      Sélectionnez une catégorie.
+    </div>
+  </div>
+
+</div>
+
+<script type="module">
+  import axios from 'https://cdn.jsdelivr.net/npm/axios@1.6.0/+esm';
+
+  const API_URL = 'http://localhost:5000/api/v1';
+  let token = localStorage.getItem('jwt_token');
+
+  window.genererNouveauTirageAuSort = async function() {
+    const catId = document.getElementById('category-selector').value;
+    if (!catId) return alert('Sélectionnez une catégorie');
+
+    try {
+      const response = await axios.get(`${API_URL}/athletes?approved=true`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      const athletes = response.data;
+      if (athletes.length === 0) return alert('Aucun athlète homologué');
+
+      // Shuffle athletes
+      athletes.sort(() => Math.random() - 0.5);
+
+      // Create matches
+      const matches = [
+        {
+          categoryId: catId,
+          athlete1Id: athletes[0]?.id,
+          athlete2Id: athletes[1]?.id,
+          round: 1,
+          matchNum: 1
+        },
+        {
+          categoryId: catId,
+          athlete1Id: athletes[2]?.id,
+          athlete2Id: athletes[3]?.id,
+          round: 1,
+          matchNum: 2
+        }
+      ];
+
+      for (const match of matches) {
+        await axios.post(`${API_URL}/matches`, match, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      }
+
+      alert('Tirage généré!');
+      chargerTableauDeLaCategorie();
+    } catch (err) {
+      console.error(err);
+      alert('Erreur lors de la génération du tirage');
+    }
+  };
+
+  window.chargerTableauDeLaCategorie = async function() {
+    const catId = document.getElementById('category-selector').value;
+    const viewport = document.getElementById('bracket-viewport');
+
+    if (!catId) {
+      viewport.innerHTML = `<div class="empty-state">Sélectionnez une catégorie.</div>`;
+      return;
+    }
+
+    try {
+      const response = await axios.get(`${API_URL}/matches/category/${catId}`);
+      const matches = response.data;
+
+      if (matches.length === 0) {
+        viewport.innerHTML = `<div class="empty-state">Aucun tirage trouvé.</div>`;
+        return;
+      }
+
+      let html = `<div class="bracket-wrapper">`;
+      const rounds = {};
+      matches.forEach(m => {
+        if (!rounds[m.round]) rounds[m.round] = [];
+        rounds[m.round].push(m);
+      });
+
+      Object.keys(rounds).forEach((round) => {
+        html += `<div class="round-column"><div class="round-title">Tour ${round}</div>`;
+        rounds[round].forEach(m => {
+          html += `
+            <div class="match-card" onclick="window.location.href='combat.html?id=${m.id}'">
+              <div class="fighter-row ${m.winnerId === m.athlete1Id ? 'winner' : ''}">
+                <div class="name">${m.athlete1Id || 'TBD'}</div>
+                <div class="score">${m.score1 || '-'}</div>
+              </div>
+              <div class="fighter-row ${m.winnerId === m.athlete2Id ? 'winner' : ''}">
+                <div class="name">${m.athlete2Id || 'TBD'}</div>
+                <div class="score">${m.score2 || '-'}</div>
+              </div>
+            </div>
+          `;
+        });
+        html += `</div>`;
+      });
+      html += `</div>`;
+      viewport.innerHTML = html;
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  window.reinitialiserCategorieCourante = function() {
+    const catId = document.getElementById('category-selector').value;
+    if (!catId) return;
+    if (!confirm('Supprimer définitivement l\'arbre?')) return;
+    alert('Arbre supprimé');
+    chargerTableauDeLaCategorie();
+  };
+
+  // Load categories on init
+  window.onload = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/athletes?approved=true`);
+      const athletes = response.data;
+      const categories = new Set(athletes.map(a => a.categoryTarget).filter(Boolean));
+      
+      const selector = document.getElementById('category-selector');
+      Array.from(categories).forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat;
+        option.textContent = cat;
+        selector.appendChild(option);
+      });
+    } catch (err) {
+      console.log('Setup needed');
+    }
+  };
+</script>
+</body>
+</html>

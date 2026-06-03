@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DojoControl - Table de Marque IJF</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+  <style>
+    :root {
+      --color-bg: #0B0F19; --color-card: #151F32; --color-border: #24344D;
+      --color-text: #F1F5F9; --color-blue: #1E40AF; --color-danger: #991B1B; 
+      --color-yellow: #EAB308; --color-gold: #EAB308;
+    }
+    * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; }
+    body { background-color: var(--color-bg); color: var(--color-text); padding: 1rem; overflow: hidden; height: 100vh; }
+    
+    #dashboard-control { display: flex; flex-direction: column; gap: 15px; max-width: 950px; margin: 0 auto; padding-top: 5px; height: 100%; justify-content: center; }
+    .dash-header { display: flex; justify-content: space-between; align-items: center; background: var(--color-card); padding: 12px 20px; border-radius: 8px; border: 1px solid var(--color-border); }
+    
+    .combat-info-bar { background: var(--color-card); border: 1px solid var(--color-border); padding: 12px; border-radius: 8px; text-align: center; }
+    .combat-info-bar h2 { font-size: 18px; color: var(--color-gold); text-transform: uppercase; margin-bottom: 4px; }
+    .combat-info-bar p { font-size: 13px; color: #94A3B8; }
+
+    .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+    .fighter-box { background: var(--color-card); border: 2px solid var(--color-border); border-radius: 10px; padding: 15px; position: relative; }
+    .fighter-box.blanc { border-color: #E2E8F0; }
+    .fighter-box.bleu { border-color: var(--color-blue); }
+    
+    .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .btn-ctrl { padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; color: white; font-size: 13px; }
+    .btn-ctrl.waza { background: #3b82f6; }
+    .btn-ctrl.ippon { background: var(--color-gold); color: #000; }
+    .btn-ctrl.shido { background: #d97706; }
+    
+    .central-actions { background: var(--color-card); border: 1px solid var(--color-border); padding: 15px; border-radius: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .btn-chrono-toggle { background: #378ADD; color: white; font-size: 16px; font-weight: bold; padding: 12px; border: none; border-radius: 6px; cursor: pointer; grid-column: span 2; }
+    .btn-cloturer { background: #10B981; color: white; font-size: 14px; font-weight: bold; padding: 12px; border: none; border-radius: 6px; cursor: pointer; }
+
+    #public-scoreboard { display: none; width: 100vw; height: 100vh; position: fixed; top: 0; left: 0; background: #000; grid-template-rows: auto 1fr auto auto; padding: 0; z-index: 50; }
+    .pub-header { display: flex; justify-content: space-between; align-items: center; background: #111827; padding: 15px 30px; border-bottom: 2px solid #1F2937; }
+    .pub-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: #000; height: 100%; }
+    .pub-side { display: flex; flex-direction: column; justify-content: space-between; padding: 1.5rem 2rem; text-align: center; }
+    .pub-side.white { background-color: #F8FAFC; color: #0F172A; }
+    .pub-side.blue { background-color: var(--color-blue); color: #FFF; }
+    
+    .pub-name { font-size: 46px; font-weight: 900; text-transform: uppercase; margin: 0; line-height: 1.1; }
+    .pub-scores { display: flex; justify-content: center; gap: 60px; margin: auto 0; }
+    .pub-val { font-family: monospace; font-size: 140px; font-weight: bold; line-height: 1; }
+  </style>
+</head>
+<body>
+
+<div id="dashboard-control">
+  <div class="dash-header">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span style="font-weight:900; font-size:20px; color:#378ADD;">DojoControl</span>
+    </div>
+    <button style="background:#10B981; border:none; color:white; padding:10px 16px; border-radius:6px; cursor:pointer;" onclick="ouvrirEcranPublic()"><i class="ti ti-external-link"></i> Écran Public</button>
+  </div>
+
+  <div class="combat-info-bar">
+    <h2 id="dash-info-cat">Catégorie non définie</h2>
+    <p id="dash-info-clubs">Match en préparation</p>
+  </div>
+
+  <div class="dash-grid">
+    <div class="fighter-box blanc">
+      <h3 style="color:#FFF; font-size: 24px;" id="dash-lbl-blanc">Blanc</h3>
+      <div class="btn-grid">
+        <button class="btn-ctrl ippon" onclick="modifierScore('blanc', 'ippon', 1)">+ IPPON</button>
+        <button class="btn-ctrl waza" onclick="modifierScore('blanc', 'waza', 1)">+ WAZA</button>
+        <button class="btn-ctrl shido" style="grid-column: span 2;" onclick="modifierScore('blanc', 'shido', 1)">+ SHIDO</button>
+      </div>
+    </div>
+
+    <div class="fighter-box bleu">
+      <h3 style="color:#3b82f6; font-size: 24px;" id="dash-lbl-bleu">Bleu</h3>
+      <div class="btn-grid">
+        <button class="btn-ctrl ippon" onclick="modifierScore('bleu', 'ippon', 1)">+ IPPON</button>
+        <button class="btn-ctrl waza" onclick="modifierScore('bleu', 'waza', 1)">+ WAZA</button>
+        <button class="btn-ctrl shido" style="grid-column: span 2;" onclick="modifierScore('bleu', 'shido', 1)">+ SHIDO</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="central-actions">
+    <button class="btn-chrono-toggle" id="btn-dash-chrono" onclick="toggleChrono()">HAJIME (DÉMARRER CHRONO)</button>
+    <button class="btn-cloturer" onclick="cloreMatch()"><i class="ti ti-check"></i> CLÔTURER LE COMBAT</button>
+  </div>
+</div>
+
+<div id="public-scoreboard">
+  <div class="pub-header">
+    <div style="font-size: 22px; font-weight: 900; color: #378ADD;">DojoControl</div>
+  </div>
+
+  <div class="pub-grid">
+    <div class="pub-side white">
+      <div>
+        <h2 class="pub-name" id="pub-name-blanc">BLANC</h2>
+      </div>
+      <div class="pub-scores">
+        <div><div class="pub-val" id="pub-ippon-blanc">0</div></div>
+      </div>
+    </div>
+
+    <div class="pub-side blue">
+      <div>
+        <h2 class="pub-name" id="pub-name-bleu">BLEU</h2>
+      </div>
+      <div class="pub-scores">
+        <div><div class="pub-val" id="pub-ippon-bleu">0</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import io from 'https://cdn.jsdelivr.net/npm/socket.io-client@4.7.0/+esm';
+
+  const socket = io('http://localhost:5000');
+  const urlParams = new URLSearchParams(window.location.search);
+  const matchId = urlParams.get('id');
+  
+  let tempsRestant = 240;
+  let chronoInterval = null;
+  let matchScores = { blanc: { ippon: 0, waza: 0, shido: 0 }, bleu: { ippon: 0, waza: 0, shido: 0 } };
+
+  window.modifierScore = function(couleur, type, valeur) {
+    matchScores[couleur][type] += valeur;
+    syncData();
+  };
+
+  window.toggleChrono = function() {
+    const btn = document.getElementById('btn-dash-chrono');
+    if (chronoInterval) {
+      clearInterval(chronoInterval);
+      chronoInterval = null;
+      btn.textContent = "HAJIME (RELANCER)";
+    } else {
+      btn.textContent = "MATTE (PAUSE CHRONO)";
+      chronoInterval = setInterval(() => {
+        if (tempsRestant > 0) tempsRestant--;
+        syncData();
+      }, 1000);
+    }
+  };
+
+  window.cloreMatch = async function() {
+    alert('Match clôturé!');
+    window.location.href = 'tirage.html';
+  };
+
+  window.ouvrirEcranPublic = function() {
+    document.getElementById('dashboard-control').style.display = 'none';
+    document.getElementById('public-scoreboard').style.display = 'grid';
+    syncData();
+  };
+
+  function syncData() {
+    const data = {
+      matchId,
+      scores: matchScores,
+      tempsRestant
+    };
+    socket.emit('update_score', data);
+    genererRenduVisuelPublic();
+  }
+
+  function genererRenduVisuelPublic() {
+    document.getElementById('pub-ippon-blanc').textContent = matchScores.blanc.ippon;
+    document.getElementById('pub-ippon-bleu').textContent = matchScores.bleu.ippon;
+  }
+
+  // Listen for real-time updates
+  socket.on('score_updated', (data) => {
+    matchScores = data.scores;
+    genererRenduVisuelPublic();
+  });
+
+  // Auto-load match data if exists
+  if (matchId) {
+    document.getElementById('dash-info-cat').textContent = `Match ${matchId}`;
+    document.getElementById('dash-lbl-blanc').textContent = 'Athlète 1';
+    document.getElementById('dash-lbl-bleu').textContent = 'Athlète 2';
+    socket.emit('join_match', matchId);
+  }
+</script>
+</body>
+</html>

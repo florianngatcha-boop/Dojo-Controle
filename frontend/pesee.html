@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DojoControl - Balance Officielle</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+  <style>
+    :root {
+      --color-primary: #1E3A8A; --color-accent: #3b82f6; --color-success: #10b981;
+      --color-danger: #ef4444; --color-warning: #f59e0b; --color-bg: #F8FAFC;
+      --color-card: #FFFFFF; --color-text: #0F172A; --color-border: #E2E8F0;
+      --border-radius: 10px;
+    }
+    * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+    body { background-color: var(--color-bg); color: var(--color-text); margin: 0; padding: 0; }
+
+    .navbar { background: var(--color-primary); color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .navbar h1 { margin: 0; font-size: 20px; display: flex; align-items: center; gap: 10px; }
+
+    .container { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
+
+    .card { background: var(--color-card); border: 1px solid var(--color-border); border-radius: var(--border-radius); padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .card-title { font-size: 18px; font-weight: 600; margin: 0 0 1.5rem 0; color: var(--color-primary); display: flex; align-items: center; gap: 8px; }
+
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
+    th { background: #F1F5F9; padding: 12px 16px; font-weight: 700; color: #475569; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; border-bottom: 2px solid var(--color-border); }
+    td { padding: 14px 16px; border-bottom: 1px solid var(--color-border); vertical-align: middle; }
+
+    input[type="number"] {
+      width: 110px; padding: 8px 10px; border: 1px solid var(--color-border);
+      border-radius: 6px; font-size: 14px; font-weight: 600;
+    }
+    input[type="number"]:focus { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+    input[type="number"].input-ok    { border-color: #10b981; background: #F0FDF4; }
+    input[type="number"].input-warn  { border-color: #f59e0b; background: #FFFBEB; }
+    input[type="number"].input-bad   { border-color: #ef4444; background: #FEF2F2; }
+
+    .badge { padding: 6px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; display: inline-flex; align-items: center; gap: 4px; }
+    .badge.success   { background: #D1FAE5; color: #065F46; }
+    .badge.warning   { background: #FEF3C7; color: #92400E; }
+    .badge.danger    { background: #FEE2E2; color: #991B1B; }
+
+    .btn-action { background: var(--color-accent); color: white; border: none; padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .btn-action:hover { background: #2563EB; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <h1><i class="ti ti-scale"></i> DojoControl — Balance Officielle</h1>
+</nav>
+
+<div class="container">
+  <div class="card">
+    <div class="card-title"><i class="ti ti-users"></i> Contrôle des Poids</div>
+    <div style="overflow-x: auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>Judoka</th>
+            <th>Genre</th>
+            <th>Catégorie Inscrite</th>
+            <th>Poids Balance (kg)</th>
+            <th>Statut</th>
+            <th style="text-align: right;">Action</th>
+          </tr>
+        </thead>
+        <tbody id="liste-pesee-corps">
+          <tr>
+            <td colspan="6" style="text-align: center; color: #64748B; padding: 2rem;">
+              <i class="ti ti-loader" style="font-size: 24px;"></i> Synchronisation...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import axios from 'https://cdn.jsdelivr.net/npm/axios@1.6.0/+esm';
+
+  const API_URL = 'http://localhost:5000/api/v1';
+  let token = localStorage.getItem('jwt_token');
+
+  async function synchroniserEtAfficher() {
+    const tbody = document.getElementById('liste-pesee-corps');
+    try {
+      const response = await axios.get(`${API_URL}/athletes?approved=false`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      const athletes = response.data;
+      if (athletes.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #64748B; padding:2rem;">Aucun athlète à peser.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = athletes.map(ath => `
+        <tr>
+          <td><strong>${ath.firstName} ${ath.lastName}</strong></td>
+          <td>${ath.gender}</td>
+          <td>${ath.categoryTarget}</td>
+          <td>
+            <input type="number" step="0.1" placeholder="0.0" 
+              id="weight-${ath.id}" value="${ath.weighInWeight || ''}"
+              oninput="enregistrerPoids('${ath.id}')"
+            >
+          </td>
+          <td>
+            <span id="badge-${ath.id}" class="badge success">OK</span>
+          </td>
+          <td style="text-align: right;">
+            <button class="btn-action" onclick="validerPoids('${ath.id}')"><i class="ti ti-check"></i> Valider</button>
+          </td>
+        </tr>
+      `).join('');
+    } catch (err) {
+      console.error(err);
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color:#ef4444">Erreur de chargement.</td></tr>`;
+    }
+  }
+
+  window.enregistrerPoids = function(athleteId) {
+    const input = document.getElementById(`weight-${athleteId}`);
+    const poids = parseFloat(input.value);
+    
+    if (poids > 0) {
+      input.classList.add('input-ok');
+    } else {
+      input.classList.remove('input-ok');
+    }
+  };
+
+  window.validerPoids = async function(athleteId) {
+    const input = document.getElementById(`weight-${athleteId}`);
+    const poids = parseFloat(input.value);
+
+    if (!poids) {
+      alert('Saisissez le poids');
+      return;
+    }
+
+    try {
+      await axios.post(`${API_URL}/pesee/${athleteId}/weight`, { weight: poids }, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      alert('Poids enregistré!');
+      synchroniserEtAfficher();
+    } catch (err) {
+      console.error(err);
+      alert('Erreur lors de l\'enregistrement');
+    }
+  };
+
+  window.onload = synchroniserEtAfficher;
+</script>
+</body>
+</html>
