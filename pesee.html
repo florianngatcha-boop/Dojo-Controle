@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DojoControl - Balance Officielle</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/pouchdb@8.0.1/dist/pouchdb.min.js"></script>
+  <style>
+    :root {
+      --color-primary: #1E3A8A; --color-accent: #3b82f6; --color-success: #10b981;
+      --color-danger: #ef4444; --color-warning: #f59e0b; --color-bg: #F8FAFC;
+      --color-card: #FFFFFF; --color-text: #0F172A; --color-border: #E2E8F0;
+      --border-radius: 10px;
+    }
+    * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+    body { background-color: var(--color-bg); color: var(--color-text); margin: 0; padding: 0; }
+
+    .navbar { background: var(--color-primary); color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .navbar h1 { margin: 0; font-size: 20px; display: flex; align-items: center; gap: 10px; }
+    .nav-links { display: flex; gap: 20px; }
+    .nav-link { color: #94A3B8; text-decoration: none; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px; transition: color 0.2s; }
+    .nav-link:hover, .nav-link.active { color: white; }
+
+    .container { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
+
+    .ijf-note {
+      background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: var(--border-radius);
+      padding: 12px 16px; margin-bottom: 1.5rem; font-size: 13px; color: #1E40AF;
+      display: flex; align-items: flex-start; gap: 10px;
+    }
+    .ijf-note i { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+
+    .card { background: var(--color-card); border: 1px solid var(--color-border); border-radius: var(--border-radius); padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .card-title { font-size: 18px; font-weight: 600; margin: 0 0 1.5rem 0; color: var(--color-primary); display: flex; align-items: center; gap: 8px; }
+
+    .table-responsive { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
+    th { background: #F1F5F9; padding: 12px 16px; font-weight: 700; color: #475569; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; border-bottom: 2px solid var(--color-border); }
+    td { padding: 14px 16px; border-bottom: 1px solid var(--color-border); vertical-align: middle; }
+
+    input[type="number"] {
+      width: 110px; padding: 8px 10px; border: 1px solid var(--color-border);
+      border-radius: 6px; font-size: 14px; font-weight: 600;
+    }
+    input[type="number"]:focus { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+    input[type="number"].input-ok    { border-color: #10b981; background: #F0FDF4; }
+    input[type="number"].input-warn  { border-color: #f59e0b; background: #FFFBEB; }
+    input[type="number"].input-bad   { border-color: #ef4444; background: #FEF2F2; }
+
+    .badge { padding: 6px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; display: inline-flex; align-items: center; gap: 4px; }
+    .badge.waiting   { background: #F1F5F9; color: #475569; }
+    .badge.success   { background: #D1FAE5; color: #065F46; }
+    .badge.warning   { background: #FEF3C7; color: #92400E; }
+    .badge.danger    { background: #FEE2E2; color: #991B1B; }
+    .badge.info      { background: #DBEAFE; color: #1E40AF; }
+
+    .gender-badge { font-size: 11px; font-weight: bold; padding: 2px 6px; border-radius: 4px; }
+    .gender-badge.m { background: #DBEAFE; color: #1D4ED8; }
+    .gender-badge.f { background: #FCE7F3; color: #BE185D; }
+
+    .btn-action { background: var(--color-accent); color: white; border: none; padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: background 0.2s; }
+    .btn-action:hover { background: #2563EB; }
+    .btn-action:disabled { background: #CBD5E1; cursor: not-allowed; }
+
+    /* Style ajouté pour le bouton Disqualifier */
+    .btn-danger { background: var(--color-danger); color: white; border: none; padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: background 0.2s; margin-right: 6px; }
+    .btn-danger:hover { background: #DC2626; }
+
+    .diagnostic-text { font-weight: 700; font-size: 14px; }
+
+    /* Tolérance visuelle sous l'input */
+    .tolerance-hint { font-size: 11px; color: #94A3B8; margin-top: 4px; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <h1><i class="ti ti-scale"></i> DojoControl — Balance Officielle</h1>
+  <div class="nav-links">
+    <a href="index.html" class="nav-link"><i class="ti ti-form"></i> Inscriptions</a>
+    <a href="pesee.html" class="nav-link active"><i class="ti ti-scale"></i> Pesée en Direct</a>
+    <a href="tirage.html" class="nav-link"><i class="ti ti-tournament"></i> Tableaux & Tirages</a>
+  </div>
+</nav>
+
+<div class="container">
+
+  <div class="ijf-note">
+    <i class="ti ti-info-circle"></i>
+    <div>
+      <strong>Règles IJF / FFJDA en vigueur :</strong>
+      Tolérance de <strong>+200 g</strong> autorisée au-dessus de la limite de catégorie.
+      Un athlète trop léger (en dessous de la limite de la catégorie inférieure + 1 g) est <strong>reclassé dans la catégorie inférieure</strong>.
+      Un athlète dépassant la tolérance est <strong>surclassé dans la catégorie supérieure</strong>.
+      Les catégories ouvertes (<strong>+</strong>) n'ont pas de limite haute.
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><i class="ti ti-users"></i> Contrôle des Poids par Genre et Catégorie</div>
+    <div class="table-responsive">
+      <table>
+        <thead>
+          <tr>
+            <th>Judoka</th>
+            <th>Âge & Genre</th>
+            <th>Cat. Inscrite</th>
+            <th>Poids Balance (kg)</th>
+            <th>Diagnostic IJF</th>
+            <th>Statut Final</th>
+            <th style="text-align: right;">Action</th>
+          </tr>
+        </thead>
+        <tbody id="liste-pesee-corps">
+          <tr>
+            <td colspan="7" style="text-align: center; color: #64748B; padding: 2rem;">
+              <i class="ti ti-loader" style="font-size: 24px;"></i> Synchronisation PouchDB...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  const db = new PouchDB('dojocontrol_db');
+
+  // ─── Tolérance officielle IJF ───────────────────────────────────────────────
+  const TOLERANCE_IJF_KG = 0.2; // +200 g au-dessus de la limite haute
+
+  // ─── Grilles officielles strictement séparées M / F ─────────────────────────
+  const REGLEMENT_POIDS = {
+    "Baby judo":  { "M": ["Poule Morphologique"], "F": ["Poule Morphologique"] },
+    "Éveil judo": { "M": ["Poule Morphologique"], "F": ["Poule Morphologique"] },
+    "Poussins":   { "M": ["Poule Morphologique"], "F": ["Poule Morphologique"] },
+    "Benjamins": {
+      "M": ["-26 kg", "-30 kg", "-34 kg", "-38 kg", "-42 kg", "-46 kg", "-50 kg", "-55 kg", "-60 kg", "-66 kg", "+66 kg"],
+      "F": ["-28 kg", "-32 kg", "-36 kg", "-40 kg", "-44 kg", "-48 kg", "-52 kg", "-57 kg", "-63 kg", "+63 kg"]
+    },
+    "Minimes": {
+      "M": ["-34 kg", "-38 kg", "-42 kg", "-46 kg", "-50 kg", "-55 kg", "-60 kg", "-66 kg", "-73 kg", "+73 kg"],
+      "F": ["-36 kg", "-40 kg", "-44 kg", "-48 kg", "-52 kg", "-57 kg", "-63 kg", "-70 kg", "+70 kg"]
+    },
+    "Cadets": {
+      "M": ["-46 kg", "-50 kg", "-55 kg", "-60 kg", "-66 kg", "-73 kg", "-81 kg", "-90 kg", "+90 kg"],
+      "F": ["-40 kg", "-44 kg", "-48 kg", "-52 kg", "-57 kg", "-63 kg", "-70 kg", "+70 kg"]
+    },
+    "Juniors": {
+      "M": ["-55 kg", "-60 kg", "-66 kg", "-73 kg", "-81 kg", "-90 kg", "-100 kg", "+100 kg"],
+      "F": ["-44 kg", "-48 kg", "-52 kg", "-57 kg", "-63 kg", "-70 kg", "-78 kg", "+78 kg"]
+    },
+    "Seniors": {
+      "M": ["-60 kg", "-66 kg", "-73 kg", "-81 kg", "-90 kg", "-100 kg", "+100 kg"],
+      "F": ["-48 kg", "-52 kg", "-57 kg", "-63 kg", "-70 kg", "-78 kg", "+78 kg"]
+    },
+    "Vétérans": {
+      "M": ["-60 kg", "-66 kg", "-73 kg", "-81 kg", "-90 kg", "-100 kg", "+100 kg"],
+      "F": ["-48 kg", "-52 kg", "-57 kg", "-63 kg", "-70 kg", "-78 kg", "+78 kg"]
+    }
+  };
+
+  // ─── Utilitaires ─────────────────────────────────────────────────────────────
+
+  /** Extrait la limite HAUTE en kg d'une catégorie. Catégorie "+" → Infinity */
+  function limiteHaute(catStr) {
+    if (!catStr) return Infinity;
+    if (catStr.startsWith('+')) return Infinity;
+    return parseFloat(catStr.replace(/[^\d.]/g, ''));
+  }
+
+  /** Extrait la limite BASSE en kg d'une catégorie à partir de la grille.
+   * La limite basse d'une catégorie = limite haute de la catégorie PRÉCÉDENTE + epsilon.
+   * La première catégorie n'a pas de limite basse (0 kg minimum). */
+  function limiteBasse(grille, indexCat) {
+    if (indexCat === 0) return 0;
+    return limiteHaute(grille[indexCat - 1]);
+  }
+
+  /** Trouve la catégorie réelle correspondant au poids dans la grille du genre. */
+  function trouverCategorieReelle(grille, poids) {
+    for (let i = 0; i < grille.length; i++) {
+      const cat = grille[i];
+      if (cat === "Poule Morphologique") return { cat, index: i };
+      if (cat.startsWith('+')) return { cat, index: i }; // catégorie ouverte : capte tout le reste
+      if (poids <= limiteHaute(cat)) return { cat, index: i };
+    }
+    // Poids au-dessus de la dernière limite (ne devrait pas arriver car "+" capte tout)
+    return { cat: grille[grille.length - 1], index: grille.length - 1 };
+  }
+
+  // ─── Cœur de l'algorithme IJF ─────────────────────────────────────────────
+
+  /**
+   * Analyse le poids selon les règles IJF et retourne un objet résultat.
+   *
+   * Règles appliquées :
+   * 1. Catégorie inscrite invalide pour le genre → Reclassé (genre corrigé).
+   * 2. Catégorie morphologique → Conforme sans contrôle de poids.
+   * 3. Catégorie ouverte (+) inscrite → Conforme (aucune limite haute).
+   * 4. Poids ≤ limite haute catégorie inscrite + 200 g (tolérance IJF)
+   * ET poids > limite haute catégorie précédente → Conforme.
+   * 5. Poids > limite haute + 200 g → Surclassé (catégorie supérieure réelle).
+   * 6. Poids ≤ limite haute catégorie précédente → Sous-classé (trop léger,
+   * reclassé dans la catégorie inférieure réelle).
+   *
+   * @returns {{ statut, categorieFinale, message, couleur }}
+   */
+  function analyserPoidsIJF(genre, catAge, catInscrite, poids) {
+    const grilleAge = REGLEMENT_POIDS[catAge];
+    if (!grilleAge) {
+      return { statut: 'Erreur', categorieFinale: '—', message: 'Catégorie d\'âge introuvable', couleur: 'danger' };
+    }
+
+    const grille = grilleAge[genre];
+    if (!grille) {
+      return { statut: 'Erreur', categorieFinale: '—', message: 'Genre invalide pour cette catégorie d\'âge', couleur: 'danger' };
+    }
+
+    // ── Règle 1 : Catégorie inscrite invalide pour ce genre ──────────────────
+    if (!grille.includes(catInscrite)) {
+      // On place l'athlète dans sa catégorie réelle selon son poids
+      const { cat: catReelle } = trouverCategorieReelle(grille, poids);
+      return {
+        statut: 'Reclassé',
+        categorieFinale: catReelle,
+        message: `Catégorie d'inscription invalide pour ce genre → ${catReelle}`,
+        couleur: 'warning'
+      };
+    }
+
+    // ── Règle 2 : Catégories morphologiques (jeunes) ─────────────────────────
+    if (catInscrite === "Poule Morphologique") {
+      return {
+        statut: 'Conforme',
+        categorieFinale: 'Poule Morphologique',
+        message: 'Poule morphologique — aucun contrôle de poids',
+        couleur: 'success'
+      };
+    }
+
+    const indexInscrit = grille.indexOf(catInscrite);
+    const hautInscrit  = limiteHaute(catInscrite);   // limite haute catégorie inscrite
+    const basInscrit   = limiteBasse(grille, indexInscrit); // limite basse = seuil catégorie précédente
+
+    // ── Règle 3 : Catégorie ouverte inscrite → pas de limite haute ───────────
+    if (catInscrite.startsWith('+')) {
+      // Vérifier quand même que le poids n'est pas SOUS la limite basse
+      if (poids <= basInscrit) {
+        // Trop léger pour la catégorie ouverte → catégorie inférieure
+        const indexSousClasse = indexInscrit - 1;
+        const catSousClasse = grille[indexSousClasse];
+        return {
+          statut: 'Sous-classé',
+          categorieFinale: catSousClasse,
+          message: `Trop léger pour ${catInscrite} → reclassé en ${catSousClasse}`,
+          couleur: 'danger'
+        };
+      }
+      return {
+        statut: 'Conforme',
+        categorieFinale: catInscrite,
+        message: `Catégorie ouverte ${catInscrite} — pas de limite haute`,
+        couleur: 'success'
+      };
+    }
+
+    // ── Règle 4 : Dans les limites + tolérance IJF ────────────────────────────
+    // L'athlète est conforme si : basInscrit < poids ≤ hautInscrit + TOLERANCE_IJF_KG
+    if (poids > basInscrit && poids <= hautInscrit + TOLERANCE_IJF_KG) {
+      const enToleranceHaute = poids > hautInscrit;
+      const messageDetail = enToleranceHaute
+        ? `${catInscrite} ✓ (dans la tolérance IJF : +${(poids - hautInscrit).toFixed(1)} kg / +200 g max)`
+        : `${catInscrite} ✓`;
+      return {
+        statut: 'Conforme',
+        categorieFinale: catInscrite,
+        message: messageDetail,
+        couleur: 'success'
+      };
+    }
+
+    // ── Règle 5 : Surpoids — au-dessus de la limite + tolérance ──────────────
+    if (poids > hautInscrit + TOLERANCE_IJF_KG) {
+      const { cat: catReelle } = trouverCategorieReelle(grille, poids);
+      const depassement = (poids - hautInscrit).toFixed(2);
+      return {
+        statut: 'Surclassé',
+        categorieFinale: catReelle,
+        message: `+${depassement} kg au-dessus (tolérance +200 g) → surclassé en ${catReelle}`,
+        couleur: 'warning'
+      };
+    }
+
+    // ── Règle 6 : Sous-poids — en dessous de la limite basse ─────────────────
+    // (poids ≤ basInscrit)
+    if (indexInscrit === 0) {
+      // Première catégorie de la grille, pas de catégorie inférieure
+      return {
+        statut: 'Conforme',
+        categorieFinale: catInscrite,
+        message: `${catInscrite} ✓ (première catégorie de la grille)`,
+        couleur: 'success'
+      };
+    }
+    const catInferieure = grille[indexInscrit - 1];
+    return {
+      statut: 'Sous-classé',
+      categorieFinale: catInferieure,
+      message: `Trop léger (≤ ${basInscrit} kg) → reclassé en catégorie inférieure : ${catInferieure}`,
+      couleur: 'danger'
+    };
+  }
+
+  // ─── Mise à jour de l'UI ──────────────────────────────────────────────────
+
+  const COULEUR_MAP = {
+    success: { badge: 'success', text: 'var(--color-success)' },
+    warning: { badge: 'warning', text: '#92400E' },
+    danger:  { badge: 'danger',  text: 'var(--color-danger)' },
+    info:    { badge: 'info',    text: '#1E40AF' }
+  };
+
+  function analyserEtAfficher(id, genre, catAge, catInscrite) {
+    const inputEl  = document.getElementById(`weight-${id}`);
+    const diagEl   = document.getElementById(`diag-${id}`);
+    const badgeEl  = document.getElementById(`badge-${id}`);
+    const poids    = parseFloat(inputEl.value);
+
+    // Réinitialiser les classes de l'input
+    inputEl.classList.remove('input-ok', 'input-warn', 'input-bad');
+
+    if (isNaN(poids) || poids <= 0) {
+      diagEl.innerHTML  = '<span style="color:#94A3B8; font-weight:normal;">En attente de pesée...</span>';
+      badgeEl.className = 'badge waiting';
+      badgeEl.textContent = 'En attente';
+      return;
+    }
+
+    const res = analyserPoidsIJF(genre, catAge, catInscrite, poids);
+
+    // Couleur du message
+    const couleurTexte = res.couleur === 'success' ? 'var(--color-success)'
+                       : res.couleur === 'warning' ? '#92400E'
+                       : res.couleur === 'danger'  ? 'var(--color-danger)'
+                       : '#1E40AF';
+
+    diagEl.innerHTML  = `<span style="color:${couleurTexte}">${res.message}</span>`;
+    badgeEl.className = `badge ${res.couleur}`;
+    badgeEl.textContent = res.statut;
+
+    // Coloriser l'input
+    if (res.couleur === 'success') inputEl.classList.add('input-ok');
+    else if (res.couleur === 'warning') inputEl.classList.add('input-warn');
+    else inputEl.classList.add('input-bad');
+  }
+
+  // ─── Afficher la grille de tolérance sous l'input ────────────────────────
+
+  function afficherToleranceHint(id, genre, catAge, catInscrite) {
+    const hintEl = document.getElementById(`hint-${id}`);
+    if (!hintEl) return;
+    const grilleAge = REGLEMENT_POIDS[catAge];
+    if (!grilleAge) return;
+    const grille = grilleAge[genre];
+    if (!grille || !grille.includes(catInscrite) || catInscrite === 'Poule Morphologique') {
+      hintEl.textContent = '';
+      return;
+    }
+    if (catInscrite.startsWith('+')) {
+      hintEl.textContent = 'Catégorie ouverte';
+      return;
+    }
+    const idx  = grille.indexOf(catInscrite);
+    const haut = limiteHaute(catInscrite);
+    const bas  = limiteBasse(grille, idx);
+    const limiteAvecTolerance = (haut + TOLERANCE_IJF_KG).toFixed(1);
+    hintEl.textContent = `Plage OK : ${bas > 0 ? bas + ' kg <' : '≤'} poids ≤ ${limiteAvecTolerance} kg (dont +200 g IJF)`;
+  }
+
+  // ─── Chargement et rendu de la table ─────────────────────────────────────
+
+  async function synchroniserEtAfficher() {
+    const tbody = document.getElementById('liste-pesee-corps');
+    try {
+      const result = await db.allDocs({ include_docs: true, startkey: 'athlete_', endkey: 'athlete_\uffff' });
+      tbody.innerHTML = '';
+
+      if (result.rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #64748B; padding:2rem;">Aucun athlète en base.</td></tr>`;
+        return;
+      }
+
+      result.rows.forEach(row => {
+        const ath = row.doc;
+        const tr  = document.createElement('tr');
+
+        let badgeClass = 'waiting';
+        if (ath.statutPesee === 'Conforme')   badgeClass = 'success';
+        if (ath.statutPesee === 'Surclassé')  badgeClass = 'warning';
+        if (ath.statutPesee === 'Reclassé')   badgeClass = 'warning';
+        if (ath.statutPesee === 'Sous-classé') badgeClass = 'danger';
+        if (ath.statutPesee === 'Disqualifié') badgeClass = 'danger';
+
+        const genreLabel = ath.genre === 'M'
+          ? '<span class="gender-badge m">Hommes</span>'
+          : '<span class="gender-badge f">Femmes</span>';
+
+        // Calcul de la plage de tolérance affichée dans la colonne Cat. Inscrite
+        let toleranceAffichee = '';
+        const grilleAge = REGLEMENT_POIDS[ath.categorieAge];
+        if (grilleAge && grilleAge[ath.genre] && grilleAge[ath.genre].includes(ath.categorieInscrite)
+            && !ath.categorieInscrite.startsWith('+') && ath.categorieInscrite !== 'Poule Morphologique') {
+          const h = limiteHaute(ath.categorieInscrite);
+          toleranceAffichee = `<br><span style="font-size:11px;color:#94A3B8;">max ${(h + TOLERANCE_IJF_KG).toFixed(1)} kg avec tolér.</span>`;
+        }
+
+        tr.innerHTML = `
+          <td>
+            <strong>${ath.nom} ${ath.prenom}</strong>
+            <br><span style="font-size:11px; color:#64748B;">${ath.abbr || ''}</span>
+          </td>
+          <td>${ath.categorieAge}<br>${genreLabel}</td>
+          <td style="font-weight: 600;">${ath.categorieInscrite}${toleranceAffichee}</td>
+          <td>
+            <input type="number" step="0.1" min="0.1" max="200" placeholder="0.0"
+              id="weight-${ath._id}" value="${ath.poidsReel || ''}"
+              oninput="analyserEtAfficher('${ath._id}', '${ath.genre}', '${ath.categorieAge}', '${ath.categorieInscrite}'); afficherToleranceHint('${ath._id}', '${ath.genre}', '${ath.categorieAge}', '${ath.categorieInscrite}')">
+            <div id="hint-${ath._id}" class="tolerance-hint"></div>
+          </td>
+          <td id="diag-${ath._id}" class="diagnostic-text">
+            ${ath.categorieFinale
+              ? `<span style="color:${ath.statutPesee === 'Conforme' ? 'var(--color-success)' : ath.statutPesee === 'Surclassé' || ath.statutPesee === 'Reclassé' ? '#92400E' : 'var(--color-danger)'};">${ath.categorieFinale}</span>`
+              : '<span style="color:#94A3B8; font-weight:normal;">En attente de pesée...</span>'}
+          </td>
+          <td>
+            <span id="badge-${ath._id}" class="badge ${badgeClass}">
+              ${ath.statutPesee || 'En attente'}
+            </span>
+          </td>
+          <td style="text-align: right; white-space: nowrap;">
+            <button class="btn-danger" onclick="disqualifierAthlete('${ath._id}')">
+              <i class="ti ti-ban"></i> Disqualifier
+            </button>
+            <button class="btn-action" onclick="sauvegarderHomologation('${ath._id}', '${ath.genre}', '${ath.categorieAge}', '${ath.categorieInscrite}')">
+              <i class="ti ti-check"></i> Valider
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+
+        // Afficher la plage de tolérance si un poids est déjà sauvegardé
+        if (ath.poidsReel) {
+          afficherToleranceHint(ath._id, ath.genre, ath.categorieAge, ath.categorieInscrite);
+        }
+      });
+    } catch (err) {
+      console.error(err);
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color:var(--color-danger)">Erreur de chargement PouchDB.</td></tr>`;
+    }
+  }
+
+  // ─── ACTION : Disqualification officielle avec confirmation ─────────────
+
+  async function disqualifierAthlete(id) {
+    if (!confirm("⚠️ Confirmez-vous la disqualification de cet athlète ? Il sera marqué comme disqualifié et exclu des tirages au sort.")) {
+      return;
+    }
+    try {
+      const doc = await db.get(id);
+      doc.statutPesee = 'Disqualifié';
+      doc.categorieFinale = 'Disqualifié';
+      doc.diagnosticIJF = 'Disqualifié à la balance';
+      doc.homologuePourTirage = false; // Bloque la visibilité dans tirage.html
+      
+      await db.put(doc);
+      synchroniserEtAfficher();
+    } catch (err) {
+      console.error(err);
+      alert('Erreur lors de la disqualification en base de données.');
+    }
+  }
+
+  // ─── Sauvegarde et homologation officielle ────────────────────────────────
+
+  async function sauvegarderHomologation(id, genre, catAge, catInscrite) {
+    const inputEl = document.getElementById(`weight-${id}`);
+    const poids   = parseFloat(inputEl.value);
+
+    if (isNaN(poids) || poids <= 0) {
+      alert('❌ Saisissez un poids valide sur la balance pour procéder à l\'homologation.');
+      return;
+    }
+
+    const res = analyserPoidsIJF(genre, catAge, catInscrite, poids);
+
+    try {
+      const doc = await db.get(id);
+
+      doc.poidsReel       = poids;
+      doc.statutPesee     = res.statut;
+      doc.categorieFinale = res.categorieFinale;
+      doc.diagnosticIJF   = res.message;
+      doc.homologuePourTirage = true;
+
+      // Clé unique inviolable pour tirage.html — ex: Seniors_F_-57kg
+      doc.categorieID = `${doc.categorieAge}_${doc.genre}_${res.categorieFinale}`.replace(/\s+/g, '');
+
+      await db.put(doc);
+      synchroniserEtAfficher();
+    } catch (err) {
+      console.error(err);
+      alert('Erreur lors de l\'homologation en base de données.');
+    }
+  }
+
+  window.onload = synchroniserEtAfficher;
+</script>
+</body>
+</html>

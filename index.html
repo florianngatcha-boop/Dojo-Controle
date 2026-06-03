@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DojoControl - Inscription des Clubs</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pouchdb@8.0.1/dist/pouchdb.min.js"></script>
+  <style>
+    :root {
+      --color-primary: #1E3A8A; --color-accent: #378ADD; --color-success: #1D9E75; 
+      --color-danger: #E24B4A; --color-warning: #F59E0B;
+      --color-bg: #F4F7FA; --color-card: #FFFFFF; --color-text: #2C3E50;
+      --color-text-light: #7F8C8D; --color-border: #E2E8F0; 
+      --border-radius-lg: 12px; --border-radius-md: 8px;
+    }
+    * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+    body { background-color: var(--color-bg); color: var(--color-text); margin: 0; padding: 0; }
+    
+    /* Navigation uniformisée avec le reste de la suite */
+    .navbar { background: var(--color-primary); color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .navbar h1 { margin: 0; font-size: 20px; display: flex; align-items: center; gap: 10px; }
+    .nav-links { display: flex; gap: 20px; }
+    .nav-link { color: #94A3B8; text-decoration: none; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px; transition: color 0.2s; }
+    .nav-link:hover, .nav-link.active { color: white; }
+    
+    .wrap { max-width: 950px; margin: 2rem auto; padding: 0 1rem; }
+    header { text-align: center; margin-bottom: 2rem; }
+    header h1 { margin: 0; color: var(--color-primary); font-size: 28px; }
+    header p { margin: 5px 0 0; color: var(--color-text-light); }
+    
+    .step-bar { display: flex; gap: 8px; margin-bottom: 2rem; }
+    .step { flex: 1; height: 6px; border-radius: 3px; background: var(--color-border); transition: all 0.3s; }
+    .step.done { background: var(--color-success); }
+    .step.active { background: var(--color-accent); }
+    #step-label { font-size: 14px; font-weight: 600; color: var(--color-primary); margin-bottom: 1rem; text-transform: uppercase; }
+    
+    .screen { display: none; } 
+    .screen.active { display: block; animation: fadeIn 0.4s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    
+    .section-card { background: var(--color-card); border: 1px solid var(--color-border); border-radius: var(--border-radius-lg); padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+    .section-title { font-size: 16px; font-weight: 600; margin: 0 0 1.25rem 0; display: flex; align-items: center; gap: 8px; color: var(--color-primary); }
+    .field-row { display: grid; gap: 15px; margin-bottom: 15px; }
+    .field-row.two { grid-template-columns: 1fr 1fr; }
+    .field-label { font-size: 12px; font-weight: 600; color: var(--color-text-light); margin-bottom: 5px; text-transform: uppercase; }
+    .req { color: var(--color-danger); margin-left: 2px; }
+    
+    input[type="text"], input[type="email"], input[type="tel"], input[type="date"], input[type="number"], select {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: var(--border-radius-md); font-size: 14px; color: var(--color-text);
+    }
+    
+    .list-header, .athlete-grid { display: grid; grid-template-columns: 1.4fr 1fr 0.7fr 1.1fr 1.1fr 1fr 40px; gap: 6px; }
+    .staff-header, .staff-grid { display: grid; grid-template-columns: 1.5fr 1.5fr 1.5fr 40px; gap: 8px; }
+    .list-header, .staff-header { padding: 0.5rem; font-size: 11px; font-weight: bold; color: var(--color-text-light); text-transform: uppercase; border-bottom: 2px solid var(--color-border); }
+    .item-row { padding: 8px 0; border-bottom: 1px solid var(--color-border); align-items: center; }
+    
+    .btn-primary, .btn-submit, .btn-prev, .add-btn, .btn-outline { padding: 10px 20px; border-radius: var(--border-radius-md); border: none; font-size: 14px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; transition: background 0.2s; }
+    .btn-primary { background: var(--color-accent); color: white; }
+    .btn-primary:hover { background: #2563EB; }
+    .btn-prev { background: #E2E8F0; color: var(--color-text); }
+    .btn-outline { background: #FFF; border: 1px solid var(--color-accent); color: var(--color-accent); }
+    .btn-outline:hover { background: #F0F7FF; }
+    .btn-submit { background: var(--color-success); color: white; width: 100%; justify-content: center; font-size: 16px; }
+    .add-btn { background: none; border: 2px dashed var(--color-accent); color: var(--color-accent); width: 100%; justify-content: center; margin-top: 10px; }
+    .delete-btn { background: none; border: none; color: var(--color-danger); cursor: pointer; font-size: 18px; }
+    
+    .info-box { background: #E0F2FE; border: 1px solid #BAE6FD; color: #0369A1; padding: 12px; border-radius: var(--border-radius-md); display: flex; gap: 10px; font-size: 13px; margin-bottom: 1.5rem; }
+    .nav-row { display: flex; justify-content: space-between; margin-top: 2rem; }
+    .nav-row.right { justify-content: flex-end; }
+    .summary-box { background: #F8FAFC; border: 1px solid var(--color-border); border-radius: var(--border-radius-md); padding: 1rem; margin-bottom: 1.5rem; }
+    .summary-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--color-border); font-size: 14px; }
+    .logo-preview { width: 50px; height: 50px; border-radius: 6px; border: 1px solid var(--color-border); object-fit: cover; display: none; }
+    .instruction-text { font-size: 11px; color: var(--color-text-light); margin-top: 2px; line-height: 1.3; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <h1><i class="ti ti-form"></i> DojoControl — Portail Inscriptions</h1>
+</nav>
+
+<div class="wrap">
+  <header>
+    <h1>DojoControl</h1>
+    <p>Portail d'inscription officiel du Festival de Judo de Maroua (Édition 2026)</p>
+  </header>
+
+  <div id="step-label">Étape 1 sur 4 — Informations club</div>
+  <div class="step-bar">
+    <div class="step active" id="s1"></div>
+    <div class="step" id="s2"></div>
+    <div class="step" id="s3"></div>
+    <div class="step" id="s4"></div>
+  </div>
+
+  <div class="screen active" id="screen-1">
+    <div class="section-card">
+      <p class="section-title"><i class="ti ti-building-castle"></i> Identité du Club</p>
+      <div class="field-row two">
+        <div>
+          <div class="field-label">Nom officiel du Club <span class="req">*</span></div>
+          <input type="text" id="club-name" placeholder="ex: Judo Club de Maroua" required oninput="mettreAJourRecapitulatif()">
+        </div>
+        <div>
+          <div class="field-label">Abréviation (TV/Table de marque) <span class="req">*</span></div>
+          <input type="text" id="club-abbr" placeholder="ex: JCM" maxlength="5" style="text-transform: uppercase;" required oninput="mettreAJourRecapitulatif()">
+        </div>
+      </div>
+      <div class="field-row two">
+        <div>
+          <div class="field-label">Responsable / Président <span class="req">*</span></div>
+          <input type="text" id="club-manager" placeholder="Nom Complet" required oninput="mettreAJourRecapitulatif()">
+        </div>
+        <div>
+          <div class="field-label">Matricule Club (Optionnel)</div>
+          <input type="text" id="club-matricule" placeholder="ex: FECA-1234" oninput="mettreAJourRecapitulatif()">
+        </div>
+      </div>
+      <div class="field-row two">
+        <div>
+          <div class="field-label">Ville <span class="req">*</span></div>
+          <input type="text" id="club-city" placeholder="Maroua" required oninput="mettreAJourRecapitulatif()">
+        </div>
+        <div>
+          <div class="field-label">Téléphone <span class="req">*</span></div>
+          <input type="tel" id="club-phone" placeholder="+237 ..." required oninput="mettreAJourRecapitulatif()">
+        </div>
+      </div>
+      <div class="field-row two">
+        <div>
+          <div class="field-label">Adresse Email <span class="req">*</span></div>
+          <input type="email" id="club-email" placeholder="contact@club.com" required oninput="mettreAJourRecapitulatif()">
+        </div>
+        <div>
+          <div class="field-label">Logo officiel du Club (.PNG / .JPG) <span class="req">*</span></div>
+          <div style="display: flex; gap: 15px; align-items: center;">
+            <input type="file" id="club-logo" accept="image/*" onchange="previewAndConvertLogo(event)" required>
+            <img id="logo-img-preview" class="logo-preview" alt="Aperçu logo">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="nav-row right">
+      <button class="btn-primary" onclick="goTo(2)">Suivant (Compétiteurs) <i class="ti ti-arrow-right"></i></button>
+    </div>
+  </div>
+
+  <div class="screen" id="screen-2">
+    <div class="section-card">
+      <p class="section-title"><i class="ti ti-file-spreadsheet"></i> Intégration de la liste des Judokas</p>
+      <div style="display: flex; gap: 15px; justify-content: center; margin-bottom: 1rem; flex-wrap: wrap;">
+        <button class="btn-outline" onclick="telechargerModeleExcel()"><i class="ti ti-download"></i> Télécharger le Canevas de saisie (.XLSX)</button>
+        <input type="file" id="csv-file" accept=".xlsx, .xls, .csv" onchange="handleFileSelect(event)" style="display:none;">
+        <button class="btn-primary" onclick="document.getElementById('csv-file').click()"><i class="ti ti-upload"></i> Injecter le fichier</button>
+      </div>
+      <p class="instruction-text" style="text-align:center;">L'ordre du canevas doit impérativement respecter : <b>Nom | Prénom | Genre (M/F) | Date Naissance | Catégorie Cible | Grade</b>.</p>
+    </div>
+
+    <div class="section-card">
+      <p class="section-title"><i class="ti ti-users"></i> Liste des Athlètes</p>
+      <div class="list-header">
+        <div>Nom <span class="req">*</span></div><div>Prénom</div><div>Genre <span class="req">*</span></div><div>Date Naiss. <span class="req">*</span></div><div>Catégorie Cible <span class="req">*</span></div><div>Grade <span class="req">*</span></div><div></div>
+      </div>
+      <div id="athletes-list"></div>
+      <button class="add-btn" onclick="ajouterCompetiteur()"><i class="ti ti-plus"></i> Ajouter une ligne d'athlète manuellement</button>
+    </div>
+
+    <div class="nav-row">
+      <button class="btn-prev" onclick="goTo(1)"><i class="ti ti-arrow-left"></i> Précédent</button>
+      <button class="btn-primary" onclick="goTo(3)">Suivant (Staff) <i class="ti ti-arrow-right"></i></button>
+    </div>
+  </div>
+
+  <div class="screen" id="screen-3">
+    <div class="section-card">
+      <p class="section-title"><i class="ti ti-user-shield"></i> Accompagnateurs & Officiels du Club</p>
+      <div class="staff-header">
+        <div>Nom <span class="req">*</span></div><div>Prénom</div><div>Rôle / Fonction <span class="req">*</span></div><div></div>
+      </div>
+      <div id="staff-list"></div>
+      <button class="add-btn" onclick="ajouterStaff()"><i class="ti ti-plus"></i> Ajouter un membre du staff</button>
+    </div>
+    <div class="nav-row">
+      <button class="btn-prev" onclick="goTo(2)"><i class="ti ti-arrow-left"></i> Précédent</button>
+      <button class="btn-primary" onclick="goTo(4)">Suivant (Récapitulatif) <i class="ti ti-arrow-right"></i></button>
+    </div>
+  </div>
+
+  <div class="screen" id="screen-4">
+    <div class="section-card">
+      <p class="section-title"><i class="ti ti-file-check"></i> Validation du Dossier d'Inscription</p>
+      <div class="summary-box">
+        <div class="summary-row"><span>Club</span><span id="recap-club-name">-</span></div>
+        <div class="summary-row"><span>Abréviation TV</span><span id="recap-club-abbr" style="font-weight:bold;">-</span></div>
+        <div class="summary-row"><span>Matricule Unique</span><span id="recap-club-matricule">-</span></div>
+        <div class="summary-row"><span>Effectifs</span><span id="recap-counts">-</span></div>
+        <div class="summary-row"><span>Statut Données</span><span id="recap-status" style="font-weight:bold;">-</span></div>
+      </div>
+      <div id="recap-error-box" class="info-box" style="display:none; background:#FEF2F2; color:#991B1B; border-color:#FCA5A5;">
+        <span id="recap-error-text"></span>
+      </div>
+      <button class="btn-submit" id="btn-submit-cloture" onclick="cloreInscription()"><i class="ti ti-database-enter"></i> Soumettre</button>
+    </div>
+    <div class="nav-row"><button class="btn-prev" onclick="goTo(3)"><i class="ti ti-arrow-left"></i> Précédent</button></div>
+  </div>
+</div>
+
+<script>
+  const db = new PouchDB('dojocontrol_db');
+  let clubLogoBase64 = "";
+
+  function goTo(step) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.step').forEach(st => st.className = 'step');
+    document.getElementById('screen-' + step).classList.add('active');
+    
+    const labels = ["Informations club", "Liste des compétiteurs", "Accompagnateurs & Staff", "Récapitulatif & Validation"];
+    document.getElementById('step-label').textContent = `Étape ${step} sur 4 — ${labels[step-1]}`;
+
+    for (let i = 1; i <= 4; i++) {
+      const el = document.getElementById('s' + i);
+      if (i < step) el.classList.add('done');
+      if (i === step) el.classList.add('active');
+    }
+    if (step === 4) mettreAJourRecapitulatif();
+    window.scrollTo(0, 0);
+  }
+
+  function previewAndConvertLogo(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      clubLogoBase64 = e.target.result;
+      const preview = document.getElementById('logo-img-preview');
+      preview.src = clubLogoBase64;
+      preview.style.display = 'block';
+      mettreAJourRecapitulatif();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function générerOptionsCategories() {
+    let options = `<option value="Poule Morphologique">Poule Morphologique (Enfants)</option>`;
+    const toutesCats = ["-26 kg","-28 kg","-30 kg","-32 kg","-34 kg","-36 kg","-38 kg","-40 kg","-42 kg","-44 kg","-46 kg","-48 kg","-50 kg","-52 kg","-55 kg","-57 kg","-60 kg","-63 kg","-66 kg","-70 kg","-73 kg","-78 kg","-81 kg","-90 kg","-100 kg","+63 kg","+66 kg","+70 kg","+73 kg","+78 kg","+90 kg","+100 kg"];
+    toutesCats.forEach(c => {
+      options += `<option value="${c}">${c}</option>`;
+    });
+    return options;
+  }
+
+  function ajouterCompetiteur(nom='', prenom='', genre='M', dateNaiss='', catCible='-73 kg', grade='Blanche') {
+    const container = document.getElementById('athletes-list');
+    const row = document.createElement('div');
+    row.className = 'item-row athlete-grid';
+    
+    let gM = (genre.trim().toUpperCase() === 'M' || genre.trim().toUpperCase() === 'MASCULIN') ? 'selected' : '';
+    let gF = (genre.trim().toUpperCase() === 'F' || genre.trim().toUpperCase() === 'FEMININ') ? 'selected' : '';
+
+    row.innerHTML = `
+      <div><input type="text" placeholder="NOM COMPLET" value="${nom}" class="ath-nom" style="text-transform: uppercase;" oninput="mettreAJourRecapitulatif()"></div>
+      <div><input type="text" placeholder="Prénom" value="${prenom}" class="ath-prenom" oninput="mettreAJourRecapitulatif()"></div>
+      <div>
+        <select class="ath-genre" onchange="mettreAJourRecapitulatif()">
+          <option value="M" ${gM}>M</option>
+          <option value="F" ${gF}>F</option>
+        </select>
+      </div>
+      <div><input type="date" value="${dateNaiss}" class="ath-date" onchange="remplirCatAutomatiqueEnfant(this); mettreAJourRecapitulatif();"></div>
+      <div>
+        <select class="ath-cat" onchange="mettreAJourRecapitulatif()">
+          ${générerOptionsCategories()}
+        </select>
+      </div>
+      <div><select class="ath-grade" onchange="mettreAJourRecapitulatif()"><option ${grade==='Blanche'?'selected':''}>Blanche</option><option ${grade==='Jaune'?'selected':''}>Jaune</option><option ${grade==='Orange'?'selected':''}>Orange</option><option ${grade==='Verte'?'selected':''}>Verte</option><option ${grade==='Bleue'?'selected':''}>Bleue</option><option ${grade==='Marron'?'selected':''}>Marron</option><option ${grade==='Noire'?'selected':''}>Noire</option></select></div>
+      <div style="text-align:center;"><button class="delete-btn" onclick="this.closest('.item-row').remove(); mettreAJourRecapitulatif();"><i class="ti ti-trash"></i></button></div>
+    `;
+    
+    row.querySelector('.ath-cat').value = catCible;
+    container.appendChild(row);
+    mettreAJourRecapitulatif();
+  }
+
+  function remplirCatAutomatiqueEnfant(inputDate) {
+    const row = inputDate.closest('.item-row');
+    const catAge = determinerCategorieAge(inputDate.value);
+    if (catAge === "Baby judo" || catAge === "Éveil judo" || catAge === "Poussins") {
+      row.querySelector('.ath-cat').value = "Poule Morphologique";
+    }
+  }
+
+  function ajouterStaff(nom='', prenom='', role='Coach / Entraîneur') {
+    const container = document.getElementById('staff-list');
+    const row = document.createElement('div');
+    row.className = 'item-row staff-grid';
+    row.innerHTML = `
+      <div><input type="text" placeholder="NOM" value="${nom}" class="stf-nom" style="text-transform: uppercase;" oninput="mettreAJourRecapitulatif()"></div>
+      <div><input type="text" placeholder="Prénom" value="${prenom}" class="stf-prenom" oninput="mettreAJourRecapitulatif()"></div>
+      <div>
+        <select class="staff-role" onchange="mettreAJourRecapitulatif()">
+          <option ${role.includes('Coach')?'selected':''}>Coach / Entraîneur</option>
+          <option ${role.includes('Arbitre')?'selected':''}>Arbitre Club</option>
+          <option ${role.includes('Médecin')?'selected':''}>Médecin</option>
+          <option ${role.includes('Parent')?'selected':''}>Parent</option>
+        </select>
+      </div>
+      <div style="text-align:center;"><button class="delete-btn" onclick="this.closest('.item-row').remove(); mettreAJourRecapitulatif();"><i class="ti ti-trash"></i></button></div>
+    `;
+    container.appendChild(row);
+    mettreAJourRecapitulatif();
+  }
+
+  function telechargerModeleExcel() {
+    const data = [
+      ["Nom", "Prenom", "Genre (M ou F)", "Date Naissance (AAAA-MM-JJ)", "Categorie Target", "Grade"],
+      ["SANOU", "Moussa", "M", "2016-04-12", "Poule Morphologique", "Jaune"],
+      ["KAMGA", "Jean-Pierre", "M", "2005-05-14", "-73 kg", "Bleue"]
+    ];
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 28 }, { wch: 18 }, { wch: 12 }];
+    XLSX.utils.book_append_sheet(wb, ws, "Canevas Inscription");
+    XLSX.writeFile(wb, "canevas_categories_maroua.xlsx");
+  }
+
+  function handleFileSelect(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+      const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
+      rows.forEach((col, i) => {
+        if (i === 0 || col.length === 0) return;
+        const csvNom = col[0] ? String(col[0]).trim() : '';
+        const csvPrenom = col[1] ? String(col[1]).trim() : '';
+        const csvGenre = col[2] ? String(col[2]).trim().toUpperCase() : 'M';
+        let csvDate = '';
+        if (col[3]) {
+          csvDate = col[3] instanceof Date ? col[3].toISOString().split('T')[0] : String(col[3]).trim();
+        }
+        let csvCat = col[4] ? String(col[4]).trim() : '-73 kg';
+        const csvGrade = col[5] ? String(col[5]).trim() : 'Blanche';
+        
+        const catAge = determinerCategorieAge(csvDate);
+        if (catAge === "Baby judo" || catAge === "Éveil judo" || catAge === "Poussins") {
+          csvCat = "Poule Morphologique";
+        }
+
+        if (csvNom !== '') ajouterCompetiteur(csvNom, csvPrenom, csvGenre, csvDate, csvCat, csvGrade);
+      });
+      document.getElementById('csv-file').value = "";
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function determinerCategorieAge(dateNaissance) {
+    if (!dateNaissance) return "Inconnue";
+    const age = 2026 - new Date(dateNaissance).getFullYear();
+    
+    if (age >= 4 && age <= 5) return "Baby judo";
+    if (age >= 6 && age <= 7) return "Éveil judo";
+    if (age >= 8 && age <= 9) return "Poussins";
+    if (age >= 10 && age <= 11) return "Benjamins";
+    if (age >= 12 && age <= 13) return "Minimes";
+    if (age >= 14 && age <= 16) return "Cadets";
+    if (age >= 17 && age <= 19) return "Juniors";
+    if (age >= 20 && age <= 29) return "Seniors";
+    if (age >= 30) return "Vétérans";
+    
+    return "Hors-catégorie";
+  }
+
+  function mettreAJourRecapitulatif() {
+    const name = document.getElementById('club-name').value.trim();
+    const abbr = document.getElementById('club-abbr').value.trim().toUpperCase();
+    const manager = document.getElementById('club-manager').value.trim();
+    const city = document.getElementById('club-city').value.trim();
+    const email = document.getElementById('club-email').value.trim();
+    const phone = document.getElementById('club-phone').value.trim();
+    let matricule = document.getElementById('club-matricule').value.trim();
+    
+    let err = [];
+    if (!name || !abbr || !manager || !city || !email || !phone || !clubLogoBase64) {
+      err.push("Club : Tous les champs obligatoires du club et le logo doivent être renseignés.");
+    }
+
+    let aCount = 0, conformiteAthletes = true;
+    document.querySelectorAll('#athletes-list .item-row').forEach((row) => {
+      const nom = row.querySelector('.ath-nom').value.trim();
+      if (nom !== '') {
+        aCount++;
+        if (!row.querySelector('.ath-date').value || !row.querySelector('.ath-cat').value) conformiteAthletes = false;
+      }
+    });
+    if (aCount === 0) err.push("Athlètes : Inscrire au minimum un compétiteur.");
+    if (!conformiteAthletes) err.push("Athlètes : Des fiches d'athlètes contiennent des éléments requis vides.");
+
+    if (matricule === '') {
+      if (!window.currentMatricule) window.currentMatricule = `DC-MAR-${Math.floor(1000 + Math.random() * 9000)}`;
+      matricule = window.currentMatricule + " (Auto)";
+    }
+
+    document.getElementById('recap-club-name').textContent = name || 'Donnée manquante';
+    document.getElementById('recap-club-abbr').textContent = abbr || '-';
+    document.getElementById('recap-club-matricule').textContent = matricule;
+    document.getElementById('recap-counts').textContent = `${aCount} Judoka(s)`;
+
+    const btn = document.getElementById('btn-submit-cloture');
+    const box = document.getElementById('recap-error-box');
+    const status = document.getElementById('recap-status');
+
+    if (err.length > 0) {
+      status.textContent = "Incomplet"; status.style.color = "var(--color-danger)";
+      box.style.display = "flex"; document.getElementById('recap-error-text').innerHTML = err.join("<br>");
+      btn.disabled = true; btn.style.opacity = "0.5";
+    } else {
+      status.textContent = "Prêt"; status.style.color = "var(--color-success)";
+      box.style.display = "none"; btn.disabled = false; btn.style.opacity = "1";
+    }
+  }
+
+  async function cloreInscription() {
+    const finalMatricule = document.getElementById('club-matricule').value.trim() || window.currentMatricule;
+    const nomClub = document.getElementById('club-name').value.trim();
+    const abbrClub = document.getElementById('club-abbr').value.trim().toUpperCase();
+    
+    try {
+      const docClub = {
+        _id: 'club_' + abbrClub,
+        type: 'club',
+        nomClub,
+        abbr: abbrClub,
+        matricule: finalMatricule,
+        logo: clubLogoBase64,
+        timestamp: new Date().toISOString()
+      };
+      
+      try {
+        const exist = await db.get(docClub._id);
+        docClub._rev = exist._rev;
+      } catch(e){}
+      await db.put(docClub);
+
+      const rows = document.querySelectorAll('#athletes-list .item-row');
+      for (let row of rows) {
+        const nom = row.querySelector('.ath-nom').value.trim().toUpperCase();
+        const prenom = row.querySelector('.ath-prenom').value.trim();
+        const genre = row.querySelector('.ath-genre').value;
+        const dateNaiss = row.querySelector('.ath-date').value;
+        const catCible = row.querySelector('.ath-cat').value;
+        const grade = row.querySelector('.ath-grade').value;
+
+        if (nom !== "") {
+          const catAge = determinerCategorieAge(dateNaiss);
+          const athleteId = `athlete_${abbrClub}_${nom.replace(/\s+/g, '')}_${prenom.replace(/\s+/g, '')}`;
+          
+          const docAthlete = {
+            _id: athleteId,
+            type: 'athlete',
+            nom, prenom, genre, dateNaissance: dateNaiss, grade,
+            club: nomClub, abbr: abbrClub,
+            categorieAge: catAge,
+            categorieInscrite: catCible,
+            statutPesee: 'En attente', 
+            poidsReel: null,
+            categorieFinale: null,
+            homologuePourTirage: false 
+          };
+
+          try {
+            const existAth = await db.get(docAthlete._id);
+            docAthlete._rev = existAth._rev;
+            docAthlete.statutPesee = existAth.statutPesee;
+            docAthlete.poidsReel = existAth.poidsReel;
+            docAthlete.categorieFinale = existAth.categorieFinale;
+            docAthlete.homologuePourTirage = existAth.homologuePourTirage;
+          } catch(e){}
+          
+          await db.put(docAthlete);
+        }
+      }
+
+      alert(`🏆 Club "${nomClub}" sauvegardé avec succès !`);
+    
+      
+      
+    } catch (err) {
+      console.error("Erreur PouchDB:", err);
+      alert("Erreur lors de l'enregistrement dans la base PouchDB.");
+    }
+  }
+
+  window.onload = function() { 
+    ajouterCompetiteur(); 
+    ajouterStaff(); 
+  };
+</script>
+</body>
+</html>

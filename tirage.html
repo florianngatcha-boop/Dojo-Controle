@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DojoControl - Tableaux & Tirages au Sort</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/pouchdb@8.0.1/dist/pouchdb.min.js"></script>
+  <style>
+    :root {
+      --color-primary: #004085; --color-accent: #3b82f6; --color-success: #10b981;
+      --color-danger: #ef4444; --color-warning: #f59e0b; --color-bg: #F4F7FA;
+      --color-card: #FFFFFF; --color-text: #0F172A; --color-border: #CBD5E1;
+      --border-radius: 8px;
+    }
+    * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+    body { background-color: var(--color-bg); color: var(--color-text); margin: 0; padding: 0; }
+
+    /* Navigation */
+    .navbar { background: var(--color-primary); color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .navbar h1 { margin: 0; font-size: 20px; display: flex; align-items: center; gap: 10px; }
+    .nav-links { display: flex; gap: 20px; }
+    .nav-link { color: #94A3B8; text-decoration: none; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px; transition: color 0.2s; }
+    .nav-link:hover, .nav-link.active { color: white; }
+
+    .container { max-width: 1400px; margin: 2rem auto; padding: 0 1rem; }
+
+    /* Panneau de contrôle */
+    .control-panel { background: var(--color-card); border: 1px solid var(--color-border); border-radius: var(--border-radius); padding: 1.5rem; margin-bottom: 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.02); display: flex; gap: 15px; align-items: center; flex-wrap: wrap; }
+    .select-group { display: flex; flex-direction: column; gap: 6px; min-width: 250px; }
+    .select-group label { font-size: 12px; font-weight: 700; color: #64748B; text-transform: uppercase; }
+    select { padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 6px; font-size: 14px; background: white; font-weight: 600; color: var(--color-primary); outline: none; }
+    select:focus { border-color: var(--color-accent); }
+
+    .btn { background: var(--color-accent); color: white; border: none; padding: 10px 18px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s; }
+    .btn:hover { background: #2563EB; box-shadow: 0 4px 12px rgba(59,130,246,0.25); }
+    .btn-secondary { background: #F1F5F9; color: #475569; }
+    .btn-secondary:hover { background: #E2E8F0; box-shadow: none; }
+
+    /* Indicateur Live */
+    .sync-badge { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #475569; background: #F1F5F9; padding: 8px 14px; border-radius: 30px; }
+    .pulse-dot { width: 8px; height: 8px; background: var(--color-success); border-radius: 50%; animation: pulse 1.6s infinite; }
+    @keyframes pulse { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16,185,129,0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(16,185,129,0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16,185,129,0); } }
+
+    /* ARBRE DE TOURNOI (BRACKET) */
+    .bracket-viewport { overflow-x: auto; padding: 2rem 1rem; background: #FFFFFF; border-radius: var(--border-radius); border: 1px solid var(--color-border); min-height: 400px; margin-bottom: 2rem; }
+    .bracket-wrapper { display: flex; gap: 60px; align-items: center; justify-content: flex-start; min-width: max-content; }
+    
+    .round-column { display: flex; flex-direction: column; justify-content: space-around; gap: 24px; min-width: 280px; }
+    .round-title { font-size: 12px; font-weight: 800; text-transform: uppercase; color: var(--color-primary); letter-spacing: 1px; text-align: center; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 2px solid var(--color-primary); }
+
+    /* Boîtier de Match (Épuré) */
+    .match-card { background: #FFFFFF; border: 1px solid var(--color-border); border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.04); padding: 4px; position: relative; transition: all 0.2s; min-height: 80px; display: flex; flex-direction: column; justify-content: center; }
+    
+    .match-card.clickable { cursor: pointer; }
+    .match-card.clickable:hover { border-color: var(--color-accent); transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(59,130,246,0.15); }
+    .match-card.clickable:hover::after { content: '👉 ENVOYER AU TAPIS'; position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%); background: var(--color-accent); color: white; font-size: 9px; font-weight: 800; padding: 2px 8px; border-radius: 4px; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 10; }
+
+    .match-meta { font-size: 10px; color: #94A3B8; font-weight: 700; padding: 2px 6px; display: flex; justify-content: space-between; position: absolute; top: -18px; left: 0; width: 100%; }
+
+    /* Ligne athlète (Zéro texte parasite si vide) */
+    .fighter-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-radius: 4px; font-size: 13px; font-weight: 700; margin: 2px 0; color: #1E293B; border: 1px solid transparent; min-height: 36px; }
+    .fighter-row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; text-transform: uppercase; }
+    .fighter-row .club { font-size: 10px; color: #64748B; font-weight: 600; display: block; }
+    .fighter-row .score { background: #F1F5F9; color: #0F172A; font-weight: 800; padding: 2px 6px; border-radius: 4px; font-size: 12px; min-width: 35px; text-align: center; border: 1px solid #E2E8F0; font-family: monospace; letter-spacing: 1px; }
+    .fighter-row .score.empty { background: transparent; border-color: transparent; color: transparent; }
+    
+    .fighter-row.winner { background: #F0FDF4; border-color: #A7F3D0; color: #065F46; }
+    .fighter-row.winner .score { background: #10B981; color: white; border-color: #059669; }
+    .fighter-row.loser { background: #F8FAFC; color: #94A3B8; text-decoration: line-through; }
+    .fighter-row.loser .club { color: #CBD5E1; }
+
+    .empty-state { text-align: center; padding: 5rem 0; color: #64748B; font-weight: 600; }
+    .empty-state i { font-size: 48px; color: #CBD5E1; display: block; margin-bottom: 15px; }
+
+    /* ─── BLOC IJF : CLASSEMENT & STATISTIQUES ─── */
+    .ijf-footer { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 3rem; display: none; }
+    
+    /* Box Classement */
+    .ijf-results { flex: 1; min-width: 300px; background: white; border: 1px solid var(--color-border); border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+    .ijf-header { background: var(--color-primary); color: white; padding: 12px; font-weight: 800; text-transform: uppercase; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+    .ijf-list { list-style: none; margin: 0; padding: 0; }
+    .ijf-list li { padding: 12px; border-bottom: 1px solid #F1F5F9; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 12px; text-transform: uppercase; color: #1E293B; }
+    .ijf-list li:last-child { border-bottom: none; }
+    .place-badge { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 4px; font-size: 12px; font-weight: 900; }
+    .place-badge.gold { background: #FEF08A; color: #92400E; border: 1px solid #FDE047; }
+    .place-badge.silver { background: #F1F5F9; color: #475569; border: 1px solid #E2E8F0; }
+    .place-badge.bronze { background: #FFEDD5; color: #9A3412; border: 1px solid #FDBA74; }
+
+    /* Box Statistiques Combats */
+    .ijf-stats { flex: 2; min-width: 500px; background: white; border: 1px solid var(--color-border); border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+    .stats-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .stats-table th { background: #F8FAFC; padding: 10px 15px; text-align: left; color: #64748B; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #E2E8F0; }
+    .stats-table td { padding: 12px 15px; border-bottom: 1px solid #F1F5F9; font-weight: 600; color: #334155; }
+    .stats-table tr:last-child td { border-bottom: none; }
+    .score-tag { background: #1E293B; color: white; padding: 4px 8px; border-radius: 4px; font-family: monospace; font-size: 13px; letter-spacing: 1px; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <h1><i class="ti ti-tournament"></i> DojoControl — Tableaux Officiels & Tirages</h1>
+  <div class="nav-links">
+    <a href="index.html" class="nav-link"><i class="ti ti-form"></i> Inscriptions</a>
+    <a href="pesee.html" class="nav-link"><i class="ti ti-scale"></i> Pesée en Direct</a>
+    <a href="tirage.html" class="nav-link active"><i class="ti ti-tournament"></i> Tableaux & Tirages</a>
+  </div>
+</nav>
+
+<div class="container">
+
+  <div class="control-panel">
+    <div class="select-group">
+      <label for="category-selector">Sélectionner une Catégorie</label>
+      <select id="category-selector" onchange="chargerTableauDeLaCategorie()">
+        <option value="">-- Choisir une catégorie --</option>
+      </select>
+    </div>
+
+    <button class="btn" onclick="genererNouveauTirageAuSort()">
+      <i class="ti ti-dice-5"></i> Générer le Tirage au Sort
+    </button>
+    
+    <button class="btn btn-secondary" onclick="reinitialiserCategorieCourante()">
+      <i class="ti ti-refresh"></i> Réinitialiser
+    </button>
+
+    <div class="sync-badge">
+      <div class="pulse-dot"></div> PouchDB Synchronisé
+    </div>
+  </div>
+
+  <div class="bracket-viewport" id="bracket-viewport">
+    <div class="empty-state">
+      <i class="ti ti-sitemap"></i>
+      Sélectionnez une catégorie pour afficher l'arbre officiel.
+    </div>
+  </div>
+
+  <div class="ijf-footer" id="ijf-footer">
+    
+    <div class="ijf-results">
+      <div class="ijf-header"><i class="ti ti-medal"></i> Classement Officiel</div>
+      <ul class="ijf-list" id="classement-list">
+        </ul>
+    </div>
+
+    <div class="ijf-stats">
+      <div class="ijf-header"><i class="ti ti-history"></i> Historique & Scores des Combats (Standard IJF)</div>
+      <table class="stats-table">
+        <thead>
+          <tr>
+            <th>Match</th>
+            <th>Vainqueur</th>
+            <th style="text-align:center;">Score (Ippon/Waza/Shido)</th>
+            <th>Perdant</th>
+          </tr>
+        </thead>
+        <tbody id="stats-tbody">
+          </tbody>
+      </table>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+  const db = new PouchDB('dojocontrol_db');
+  let listeCategoriesDisponibles = new Set();
+
+  const NOM_ROUNDS = {
+    1: "Demi-finales",
+    2: "Grande Finale"
+  };
+
+  async function initialiserFiltreCategories() {
+    try {
+      const result = await db.allDocs({ include_docs: true, startkey: 'athlete_', endkey: 'athlete_\uffff' });
+      const selector = document.getElementById('category-selector');
+      
+      listeCategoriesDisponibles.clear();
+      result.rows.forEach(row => {
+        const ath = row.doc;
+        if (ath.homologuePourTirage === true && ath.categorieID) {
+          listeCategoriesDisponibles.add(ath.categorieID);
+        }
+      });
+
+      selector.innerHTML = '<option value="">-- Choisir une catégorie --</option>';
+      Array.from(listeCategoriesDisponibles).sort().forEach(catId => {
+        const option = document.createElement('option');
+        option.value = catId;
+        option.text = catId.replace(/_/g, ' ');
+        selector.appendChild(option);
+      });
+    } catch (err) { console.error(err); }
+  }
+
+  // GÉNÉRATION DU TIRAGE
+  async function genererNouveauTirageAuSort() {
+    const catId = document.getElementById('category-selector').value;
+    if (!catId) return alert("❌ Veuillez sélectionner une catégorie.");
+
+    const matchesExistants = await db.allDocs({ startkey: `match_${catId}_`, endkey: `match_${catId}_\uffff` });
+    if (matchesExistants.rows.length > 0) {
+      if (!confirm("⚠️ Écraser l'arbre existant ? Cela effacera les scores enregistrés.")) return;
+      for (let row of matchesExistants.rows) {
+        await db.remove(await db.get(row.id));
+      }
+    }
+
+    const result = await db.allDocs({ include_docs: true, startkey: 'athlete_', endkey: 'athlete_\uffff' });
+    let athletes = result.rows.map(r => r.doc).filter(a => a.homologuePourTirage === true && a.categorieID === catId);
+
+    if (athletes.length === 0) return alert("❌ Aucun athlète homologué.");
+
+    athletes.sort(() => Math.random() - 0.5);
+
+    let matchesAEnregistrer = [];
+
+    // SI 1 SEUL ATHLÈTE -> PROPULSÉ DIRECTEMENT EN GRANDE FINALE, LE RESTE RESTE VIDE
+    if (athletes.length === 1) {
+      const seulAth = athletes[0];
+      matchesAEnregistrer = [
+        {
+          _id: `match_${catId}_R1_M1`, categorieID: catId, round: 1, matchNum: 1, type: 'match',
+          athlete1: null, athlete2: null, score1: "", score2: "", statut: '', winnerId: null
+        },
+        {
+          _id: `match_${catId}_R1_M2`, categorieID: catId, round: 1, matchNum: 2, type: 'match',
+          athlete1: null, athlete2: null, score1: "", score2: "", statut: '', winnerId: null
+        },
+        {
+          _id: `match_${catId}_R2_M1`, categorieID: catId, round: 2, matchNum: 1, type: 'match',
+          athlete1: { id: seulAth._id, nom: `${seulAth.nom} ${seulAth.prenom}`, club: seulAth.abbr || 'LIG' },
+          athlete2: null, score1: "", score2: "", statut: 'Vainqueur Unique', winnerId: seulAth._id
+        }
+      ];
+    } else {
+      let m1_a1 = athletes[0] || null;
+      let m1_a2 = athletes[1] || null;
+      let m2_a1 = athletes[2] || null;
+      let m2_a2 = athletes[3] || null;
+
+      matchesAEnregistrer = [
+        {
+          _id: `match_${catId}_R1_M1`, categorieID: catId, round: 1, matchNum: 1, type: 'match',
+          athlete1: m1_a1 ? { id: m1_a1._id, nom: `${m1_a1.nom} ${m1_a1.prenom}`, club: m1_a1.abbr || 'LIG' } : null,
+          athlete2: m1_a2 ? { id: m1_a2._id, nom: `${m1_a2.nom} ${m1_a2.prenom}`, club: m1_a2.abbr || 'LIG' } : null,
+          score1: "", score2: "", statut: '', winnerId: null
+        },
+        {
+          _id: `match_${catId}_R1_M2`, categorieID: catId, round: 1, matchNum: 2, type: 'match',
+          athlete1: m2_a1 ? { id: m2_a1._id, nom: `${m2_a1.nom} ${m2_a1.prenom}`, club: m2_a1.abbr || 'LIG' } : null,
+          athlete2: m2_a2 ? { id: m2_a2._id, nom: `${m2_a2.nom} ${m2_a2.prenom}`, club: m2_a2.abbr || 'LIG' } : null,
+          score1: "", score2: "", statut: '', winnerId: null
+        },
+        {
+          _id: `match_${catId}_R2_M1`, categorieID: catId, round: 2, matchNum: 1, type: 'match',
+          athlete1: null, athlete2: null, score1: "", score2: "", statut: '', winnerId: null
+        }
+      ];
+    }
+
+    for (let m of matchesAEnregistrer) await db.put(m);
+    chargerTableauDeLaCategorie();
+  }
+
+  function envoyerAuTapis(matchId) {
+    window.location.href = `combat.html?id=${matchId}`;
+  }
+
+  // CHARGEMENT DE L'ARBRE ET DES STATISTIQUES
+  async function chargerTableauDeLaCategorie() {
+    const catId = document.getElementById('category-selector').value;
+    const viewport = document.getElementById('bracket-viewport');
+    const footer = document.getElementById('ijf-footer');
+
+    if (!catId) {
+      viewport.innerHTML = `<div class="empty-state"><i class="ti ti-sitemap"></i>Sélectionnez une catégorie pour afficher l'arbre.</div>`;
+      footer.style.display = "none";
+      return;
+    }
+
+    try {
+      const result = await db.allDocs({ include_docs: true, startkey: `match_${catId}_`, endkey: `match_${catId}_\uffff` });
+      const matches = result.rows.map(r => r.doc);
+
+      if (matches.length === 0) {
+        viewport.innerHTML = `<div class="empty-state"><i class="ti ti-dice-1"></i>Aucun tirage trouvé. Générez l'arbre.</div>`;
+        footer.style.display = "none";
+        return;
+      }
+
+      footer.style.display = "flex"; // Afficher la zone Stats
+
+      // 1. DESSINER L'ARBRE GRAPHIPHQUE
+      let roundsMap = {};
+      matches.forEach(m => {
+        if (!roundsMap[m.round]) roundsMap[m.round] = [];
+        roundsMap[m.round].push(m);
+      });
+
+      let html = `<div class="bracket-wrapper">`;
+      Object.keys(roundsMap).forEach((roundKey) => {
+        roundsMap[roundKey].sort((a,b) => a.matchNum - b.matchNum);
+        const labelRound = NOM_ROUNDS[roundKey] || `Tour ${roundKey}`;
+        
+        html += `<div class="round-column"><div class="round-title">${labelRound}</div>`;
+
+        roundsMap[roundKey].forEach(m => {
+          const hasAthletes = (m.athlete1 || m.athlete2);
+          const clickableClass = (hasAthletes && !m.winnerId) ? 'clickable' : '';
+          const actionClick = (hasAthletes && !m.winnerId) ? `onclick="envoyerAuTapis('${m._id}')"` : '';
+          
+          let c1Class = '', c2Class = '';
+          if (m.winnerId) {
+            if (m.athlete1) c1Class = (m.winnerId === m.athlete1.id) ? 'winner' : 'loser';
+            if (m.athlete2) c2Class = (m.winnerId === m.athlete2.id) ? 'winner' : 'loser';
+          }
+
+          // Strictement vide si pas d'infos
+          const showNum = hasAthletes ? `N° ${m.matchNum}` : '';
+
+          html += `
+            <div class="match-card ${clickableClass}" ${actionClick}>
+              <div class="match-meta"><span>${showNum}</span></div>
+              
+              <div class="fighter-row ${c1Class}">
+                <div class="name">${m.athlete1 ? m.athlete1.nom : ''} <span class="club">${m.athlete1 ? m.athlete1.club : ''}</span></div>
+                <div class="score ${!m.athlete1 || m.score1 === "" ? 'empty' : ''}">${m.score1 || ''}</div>
+              </div>
+
+              <div class="fighter-row ${c2Class}">
+                <div class="name">${m.athlete2 ? m.athlete2.nom : ''} <span class="club">${m.athlete2 ? m.athlete2.club : ''}</span></div>
+                <div class="score ${!m.athlete2 || m.score2 === "" ? 'empty' : ''}">${m.score2 || ''}</div>
+              </div>
+            </div>`;
+        });
+        html += `</div>`;
+      });
+      html += `</div>`;
+      viewport.innerHTML = html;
+
+      // 2. CALCULER LES RÉSULTATS & STATISTIQUES (IJF)
+      let premier = "—", second = "—", troisiemeA = "—", troisiemeB = "—";
+      let statsHTML = "";
+
+      matches.forEach(m => {
+        // Extraction du Classement Final
+        if (m.round === 2 && m.winnerId) {
+          premier = (m.winnerId === m.athlete1?.id) ? m.athlete1.nom : (m.athlete2 ? m.athlete2.nom : "—");
+          second = (m.winnerId === m.athlete1?.id) ? (m.athlete2 ? m.athlete2.nom : "—") : (m.athlete1 ? m.athlete1.nom : "—");
+        }
+        if (m.round === 1 && m.winnerId && m.athlete1 && m.athlete2) {
+          // Les perdants des demi-finales sont 3ème
+          if (m.matchNum === 1) troisiemeA = (m.winnerId === m.athlete1.id) ? m.athlete2.nom : m.athlete1.nom;
+          if (m.matchNum === 2) troisiemeB = (m.winnerId === m.athlete1.id) ? m.athlete2.nom : m.athlete1.nom;
+        }
+
+        // Extraction pour le Tableau des Statistiques (Uniquement les matchs joués)
+        if (m.winnerId && m.athlete1 && m.athlete2) {
+          const vainqueur = m.winnerId === m.athlete1.id ? m.athlete1.nom : m.athlete2.nom;
+          const perdant = m.winnerId === m.athlete1.id ? m.athlete2.nom : m.athlete1.nom;
+          // Formatage d'affichage du score IJF (ex: "10 - 00")
+          const affichageScore = `${m.score1 || '0'} - ${m.score2 || '0'}`;
+
+          statsHTML += `
+            <tr>
+              <td>R${m.round} - M${m.matchNum}</td>
+              <td style="color:var(--color-success);">${vainqueur}</td>
+              <td style="text-align:center;"><span class="score-tag">${affichageScore}</span></td>
+              <td style="color:#94A3B8;">${perdant}</td>
+            </tr>
+          `;
+        }
+      });
+
+      // Injection dans le HTML
+      document.getElementById('classement-list').innerHTML = `
+        <li><div class="place-badge gold">1</div> ${premier}</li>
+        <li><div class="place-badge silver">2</div> ${second}</li>
+        <li><div class="place-badge bronze">3</div> ${troisiemeA}</li>
+        <li><div class="place-badge bronze">3</div> ${troisiemeB}</li>
+      `;
+
+      document.getElementById('stats-tbody').innerHTML = statsHTML || `<tr><td colspan="4" style="text-align:center; color:#94A3B8;">Aucun combat terminé pour le moment.</td></tr>`;
+
+    } catch (err) { console.error(err); }
+  }
+
+  async function reinitialiserCategorieCourante() {
+    const catId = document.getElementById('category-selector').value;
+    if (!catId) return;
+    if (!confirm("⚠️ Supprimer définitivement l'arbre de cette catégorie ?")) return;
+    try {
+      const matchesExistants = await db.allDocs({ startkey: `match_${catId}_`, endkey: `match_${catId}_\uffff` });
+      for (let row of matchesExistants.rows) await db.remove(await db.get(row.id));
+      chargerTableauDeLaCategorie();
+    } catch (err) { console.error(err); }
+  }
+
+  // Écouteur PouchDB pour mettre à jour l'arbre DÈS QUE combat.html valide un Ippon/Waza-ari
+  db.changes({ since: 'now', live: true, include_docs: true }).on('change', (change) => {
+    if (change.doc._id.startsWith('match_')) {
+      if (document.getElementById('category-selector').value) {
+        chargerTableauDeLaCategorie();
+      }
+    }
+  });
+
+  window.onload = initialiserFiltreCategories;
+</script>
+</body>
+</html>

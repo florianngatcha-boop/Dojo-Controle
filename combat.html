@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DojoControl - Table de Marque Option IJF</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/pouchdb@8.0.1/dist/pouchdb.min.js"></script>
+
+  <style>
+    :root {
+      --color-bg: #0B0F19; --color-card: #151F32; --color-border: #24344D;
+      --color-text: #F1F5F9; --color-blue: #1E40AF; --color-danger: #991B1B; 
+      --color-yellow: #EAB308; --color-gold: #EAB308;
+    }
+    * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; }
+    body { background-color: var(--color-bg); color: var(--color-text); padding: 1rem; overflow: hidden; height: 100vh; }
+    
+    /* INTERFACE CONTROLEUR ARBITRE */
+    #dashboard-control { display: flex; flex-direction: column; gap: 15px; max-width: 950px; margin: 0 auto; padding-top: 5px; height: 100%; justify-content: center; }
+    .dash-header { display: flex; justify-content: space-between; align-items: center; background: var(--color-card); padding: 12px 20px; border-radius: 8px; border: 1px solid var(--color-border); }
+    .btn-projecteur { background: #10B981; border: none; color: white; padding: 10px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 14px; }
+    
+    .combat-info-bar { background: var(--color-card); border: 1px solid var(--color-border); padding: 12px; border-radius: 8px; text-align: center; position: relative; }
+    .combat-info-bar h2 { font-size: 18px; color: var(--color-gold); text-transform: uppercase; margin-bottom: 4px; }
+    .combat-info-bar p { font-size: 13px; color: #94A3B8; }
+    .match-number-badge { position: absolute; top: 10px; right: 15px; background: #378ADD; padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 12px; }
+
+    .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+    .fighter-box { background: var(--color-card); border: 2px solid var(--color-border); border-radius: 10px; padding: 15px; position: relative; }
+    .fighter-box.blanc { border-color: #E2E8F0; }
+    .fighter-box.bleu { border-color: var(--color-blue); }
+    
+    .win-alert-indicator { position: absolute; top: 10px; right: 10px; background: var(--color-danger); color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; display: none; animation: blink 1s infinite; }
+    @keyframes blink { 50% { opacity: 0.3; } }
+
+    .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .btn-ctrl { padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; color: white; font-size: 13px; }
+    .btn-ctrl.waza { background: #3b82f6; }
+    .btn-ctrl.ippon { background: var(--color-gold); color: #000; }
+    .btn-ctrl.shido { background: #d97706; }
+    .btn-ctrl.remove { background: #334155; font-size: 11px; margin-top: 5px; grid-column: span 2; }
+    
+    .central-actions { background: var(--color-card); border: 1px solid var(--color-border); padding: 15px; border-radius: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .btn-chrono-toggle { background: #378ADD; color: white; font-size: 16px; font-weight: bold; padding: 12px; border: none; border-radius: 6px; cursor: pointer; grid-column: span 2; }
+    .btn-undo-unique { background: #475569; color: white; font-size: 14px; font-weight: bold; padding: 12px; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn-cloturer { background: #10B981; color: white; font-size: 14px; font-weight: bold; padding: 12px; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background 0.2s;}
+    .btn-cloturer:hover { background: #059669; }
+
+    /* ==================== SCREEN PUBLIC (PROJECTEUR) ==================== */
+    #public-scoreboard { display: none; width: 100vw; height: 100vh; position: fixed; top: 0; left: 0; background: #000; grid-template-rows: auto 1fr auto auto; padding: 0; z-index: 50; }
+    .pub-header { display: flex; justify-content: space-between; align-items: center; background: #111827; padding: 15px 30px; border-bottom: 2px solid #1F2937; }
+    .pub-rubrique { background: #1E293B; border: 1px solid #334155; padding: 6px 16px; border-radius: 4px; font-size: 16px; font-weight: bold; color: var(--color-gold); text-transform: uppercase; }
+    
+    .pub-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: #000; height: 100%; }
+    .pub-side { display: flex; flex-direction: column; justify-content: space-between; padding: 1.5rem 2rem; text-align: center; }
+    .pub-side.white { background-color: #F8FAFC; color: #0F172A; }
+    .pub-side.blue { background-color: var(--color-blue); color: #FFF; }
+    
+    .pub-competitor-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+    .pub-name { font-size: 46px; font-weight: 900; text-transform: uppercase; margin: 0; line-height: 1.1; }
+    .pub-logo { width: 60px; height: 60px; object-fit: contain; border-radius: 8px; background: rgba(255,255,255,0.1); padding: 4px; }
+    .pub-side.white .pub-logo { background: transparent; }
+    .pub-abbr-badge { background: #1E293B; color: var(--color-gold); font-size: 18px; font-weight: bold; padding: 4px 10px; border-radius: 6px; border: 1px solid #334155; letter-spacing: 1px; }
+    .pub-club-info { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 5px; }
+
+    .pub-scores { display: flex; justify-content: center; gap: 60px; margin: auto 0; }
+    .pub-val { font-family: monospace; font-size: 140px; font-weight: bold; line-height: 1; }
+    .pub-lbl { font-size: 12px; font-weight: bold; text-transform: uppercase; opacity: 0.7; }
+    
+    .pub-shidos { display: flex; justify-content: center; gap: 15px; min-height: 45px; align-items: center; }
+    .shido-card-ijf { width: 32px; height: 45px; border-radius: 4px; background: transparent; border: 2px dashed rgba(100,116,139,0.3); transition: all 0.2s; }
+    .pub-side.white .shido-card-ijf { border-color: rgba(15,23,42,0.1); }
+    
+    .shido-card-ijf.yellow-card { background: #EAB308 !important; border: 1px solid #CA8A04 !important; box-shadow: 0 4px 10px rgba(234,179,8,0.4); }
+    .shido-card-ijf.red-card { background: #EF4444 !important; border: 1px solid #DC2626 !important; box-shadow: 0 4px 12px rgba(239,68,68,0.5); animation: flashRed 0.5s ease infinite alternate; }
+    @keyframes flashRed { from { opacity: 0.6; } to { opacity: 1; } }
+    
+    .pub-chrono-panel { background: #111827; grid-column: span 2; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1rem; border-top: 2px solid #1F2937; }
+    .pub-timer { font-family: monospace; font-size: 110px; font-weight: bold; color: #10B981; line-height: 1; }
+    .pub-timer.paused { color: #EF4444; }
+    .pub-timer.golden-score { color: var(--color-gold) !important; }
+    .pub-gs-lbl { font-size: 14px; font-weight: bold; color: var(--color-gold); text-transform: uppercase; margin-top: 5px; display: none; }
+
+    /* ANIMATIONS IPPON */
+    .ippon-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 99999; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+    .ippon-overlay.win-blanc { background: radial-gradient(circle, #FFFFFF 0%, #cbd5e1 100%); color: #0F172A; }
+    .ippon-overlay.win-bleu { background: radial-gradient(circle, #2563EB 0%, #0F172A 100%); color: #FFFFFF; }
+    .ippon-overlay.active { display: flex; animation: fadeOutOverlay 0.3s ease 1.8s forwards; }
+    
+    .ippon-winner { font-size: 60px; text-transform: uppercase; font-weight: 800; letter-spacing: 2px; margin-bottom: 10px; transform: scale(0.8); opacity: 0; }
+    .ippon-overlay.active .ippon-winner { animation: popText 0.4s 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+    .ippon-text { font-size: 200px; font-weight: 900; margin: 0; letter-spacing: 6px; transform: translateY(50px); opacity: 0; }
+    .ippon-overlay.win-blanc .ippon-text { color: #0F172A; text-shadow: 0 10px 30px rgba(0,0,0,0.15); }
+    .ippon-overlay.win-bleu .ippon-text { color: #FFF; text-shadow: 0 10px 40px rgba(234,179,8,0.6); }
+    .ippon-overlay.active .ippon-text { animation: slideUpIppon 0.5s 0.1s cubic-bezier(0.075, 0.82, 0.165, 1) forwards; }
+
+    @keyframes popText { to { transform: scale(1); opacity: 1; } }
+    @keyframes slideUpIppon { to { transform: translateY(0); opacity: 1; } }
+    @keyframes fadeOutOverlay { to { opacity: 0; visibility: hidden; } }
+
+    #waiting-screen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #0B0F19; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    #waiting-screen h1 { font-size: 32px; margin-bottom: 10px; color: #64748B; }
+  </style>
+</head>
+<body>
+
+  <div id="waiting-screen">
+    <h1><i class="ti ti-hourglass" style="animation: blink 2s infinite"></i> SURFACE EN ATTENTE</h1>
+    <p id="wait-subtext" style="color: #475569;">Recherche du match dans l'arbre du tournoi...</p>
+  </div>
+
+  <div id="dashboard-control">
+    <div class="dash-header">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="font-weight:900; font-size:20px; color:#378ADD;">DojoControl</span>
+        <span style="background:#24344D; padding:4px 8px; border-radius:4px; font-size:11px; color:var(--color-gold); font-weight:bold;" id="dash-tapis-id">TABLE DE MARQUE</span>
+      </div>
+      <button class="btn-projecteur" onclick="ouvrirEcranPublic()"><i class="ti ti-external-link"></i> Déporter l'Écran Public</button>
+    </div>
+
+    <div class="combat-info-bar">
+      <div class="match-number-badge" id="dash-info-match">M#?</div>
+      <h2 id="dash-info-cat">Catégorie non définie</h2>
+      <p id="dash-info-clubs">Match en préparation</p>
+    </div>
+
+    <div class="dash-grid">
+      <div class="fighter-box blanc">
+        <div class="win-alert-indicator" id="alert-blanc">💡 SEUIL VICTOIRE</div>
+        <h3 style="color:#FFF; font-size: 24px;" id="dash-lbl-blanc">Blanc</h3>
+        <div class="btn-grid">
+          <button class="btn-ctrl ippon" onclick="modifierScore('blanc', 'ippon', 1)">+ IPPON</button>
+          <button class="btn-ctrl waza" onclick="modifierScore('blanc', 'waza', 1)">+ WAZA</button>
+          <button class="btn-ctrl shido" style="grid-column: span 2;" onclick="modifierScore('blanc', 'shido', 1)">+ SHIDO (CARTON)</button>
+          <button class="btn-ctrl remove" onclick="retirerDernierPointManuellement('blanc')">Retirer / Corriger Blanc</button>
+        </div>
+      </div>
+
+      <div class="fighter-box bleu">
+        <div class="win-alert-indicator" id="alert-bleu">💡 SEUIL VICTOIRE</div>
+        <h3 style="color:#3b82f6; font-size: 24px;" id="dash-lbl-bleu">Bleu</h3>
+        <div class="btn-grid">
+          <button class="btn-ctrl ippon" onclick="modifierScore('bleu', 'ippon', 1)">+ IPPON</button>
+          <button class="btn-ctrl waza" onclick="modifierScore('bleu', 'waza', 1)">+ WAZA</button>
+          <button class="btn-ctrl shido" style="grid-column: span 2;" onclick="modifierScore('bleu', 'shido', 1)">+ SHIDO (CARTON)</button>
+          <button class="btn-ctrl remove" onclick="retirerDernierPointManuellement('bleu')">Retirer / Corriger Bleu</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="central-actions">
+      <button class="btn-chrono-toggle" id="btn-dash-chrono" onclick="toggleChrono()">HAJIME (DÉMARRER CHRONO)</button>
+      <button class="btn-undo-unique" onclick="actionCorrectionGenerale()"><i class="ti ti-arrow-back-up"></i> ANNULER DERNIÈRE ACTION</button>
+      <button class="btn-cloturer" onclick="cloreEtSauvegarderMatchDefinitif()"><i class="ti ti-check"></i> CLÔTURER LE COMBAT ET RETOUR</button>
+    </div>
+    <div style="font-size:12px; color:#64748B; text-align:center;">
+      [Espace] Règle Chrono | Les résultats s'insèreront automatiquement dans l'arbre du tournoi
+    </div>
+  </div>
+
+  <div id="public-scoreboard">
+    <div class="pub-header">
+      <div style="font-size: 22px; font-weight: 900; color: #378ADD;" id="pub-view-tapis">DojoControl</div>
+      <div class="pub-rubrique" id="pub-view-rubrique">Catégorie</div>
+    </div>
+
+    <div class="pub-grid">
+      <div class="pub-side white">
+        <div class="pub-competitor-wrap">
+          <img id="pub-logo-blanc" class="pub-logo" src="https://cdn-icons-png.flaticon.com/512/1071/1071114.png" alt="Logo">
+          <div>
+            <h2 class="pub-name" id="pub-name-blanc">Chargement...</h2>
+            <div class="pub-club-info">
+              <span class="pub-abbr-badge" id="pub-abbr-blanc">IND</span>
+              <span style="font-size: 22px; font-weight: bold; opacity: 0.8;" id="pub-club-blanc">Club</span>
+            </div>
+          </div>
+        </div>
+        <div class="pub-scores">
+          <div><div class="pub-val" id="pub-ippon-blanc">0</div><div class="pub-lbl">Ippon</div></div>
+          <div><div class="pub-val" id="pub-waza-blanc">0</div><div class="pub-lbl">Waza-ari</div></div>
+        </div>
+        <div class="pub-shidos" id="container-shido-blanc">
+          <div class="shido-card-ijf" id="card-blanc-1"></div>
+          <div class="shido-card-ijf" id="card-blanc-2"></div>
+          <div class="shido-card-ijf" id="card-blanc-3"></div>
+        </div>
+      </div>
+
+      <div class="pub-side blue">
+        <div class="pub-competitor-wrap">
+          <img id="pub-logo-bleu" class="pub-logo" src="https://cdn-icons-png.flaticon.com/512/1071/1071114.png" alt="Logo">
+          <div>
+            <h2 class="pub-name" id="pub-name-bleu">Chargement...</h2>
+            <div class="pub-club-info">
+              <span class="pub-abbr-badge" id="pub-abbr-bleu">IND</span>
+              <span style="font-size: 22px; font-weight: bold; opacity: 0.8;" id="pub-club-bleu">Club</span>
+            </div>
+          </div>
+        </div>
+        <div class="pub-scores">
+          <div><div class="pub-val" id="pub-ippon-bleu">0</div><div class="pub-lbl">Ippon</div></div>
+          <div><div class="pub-val" id="pub-waza-bleu">0</div><div class="pub-lbl">Waza-ari</div></div>
+        </div>
+        <div class="pub-shidos" id="container-shido-bleu">
+          <div class="shido-card-ijf" id="card-bleu-1"></div>
+          <div class="shido-card-ijf" id="card-bleu-2"></div>
+          <div class="shido-card-ijf" id="card-bleu-3"></div>
+        </div>
+      </div>
+
+      <div class="pub-chrono-panel">
+        <div class="pub-timer paused" id="pub-view-chrono">04:00</div>
+        <div class="pub-gs-lbl" id="pub-view-gs-label">Golden Score</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ippon-overlay" id="pub-ippon-overlay">
+    <div class="ippon-winner" id="pub-ippon-winner-name">NOM DU VAINQUEUR</div>
+    <h1 class="ippon-text">IPPON</h1>
+  </div>
+
+  <script>
+    const db = new PouchDB('dojocontrol_db');
+    const canalBroadcast = new BroadcastChannel('dojo_fij_channel');
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const estEcranPublicUniquement = (urlParams.get('mode') === 'public');
+    const idMatchRequis = urlParams.get('id'); // L'ID envoyé par tirage.html
+    let tapisID = urlParams.get('tapis') || "1"; 
+
+    let tempsReglementaire = 240; 
+    let tempsRestant = 240;
+    let chronoInterval = null;
+    let isGoldenScore = false;
+    let vainqueurDuMatch = "";
+    
+    // Contient le document PouchDB du Match
+    let combatDonneesInitiales = null; 
+    let matchScores = { blanc: { ippon: 0, waza: 0, shido: 0 }, bleu: { ippon: 0, waza: 0, shido: 0 } };
+    let pileHistoriqueGlobale = [];
+
+    // Lancement selon le mode (Projecteur ou Table de Marque)
+    if (estEcranPublicUniquement) {
+      document.getElementById('dashboard-control').style.display = 'none';
+      document.getElementById('public-scoreboard').style.display = 'grid';
+      
+      canalBroadcast.onmessage = (e) => {
+        if (e.data.tapis === tapisID) {
+          if (e.data.type === 'REFRESH_SCREEN') {
+            document.getElementById('waiting-screen').style.display = 'none';
+            genererRenduVisuelPublic(e.data.payload);
+          }
+          if (e.data.type === 'TRIGGER_IPPON_ANIMATION') {
+            executerAnimationVisuelleDeuxSecondes(e.data.vainqueur, e.data.couleur);
+          }
+          if (e.data.type === 'FORCE_RESET') {
+            document.getElementById('waiting-screen').style.display = 'flex';
+          }
+        }
+      };
+    } else {
+      if (idMatchRequis) {
+        chargerMatchDepuisTirage(idMatchRequis);
+      } else {
+        document.getElementById('wait-subtext').textContent = "Aucun ID de match transmis. Veuillez lancer depuis le Tableau.";
+      }
+    }
+
+    // --- LOGIQUE DE LIAISON AU WORKFLOW (TIRAGE) ---
+    async function chargerMatchDepuisTirage(matchId) {
+      try {
+        const match = await db.get(matchId);
+        document.getElementById('waiting-screen').style.display = 'none';
+
+        combatDonneesInitiales = {
+          idMatch: match._id,
+          categorieID: match.categorieID,
+          round: match.round,
+          matchNum: match.matchNum,
+          athleteBlanc: match.athlete1 || { nom: "À DÉFINIR", club: "---", abbr: "---", id: null },
+          athleteBleu: match.athlete2 || { nom: "À DÉFINIR", club: "---", abbr: "---", id: null }
+        };
+
+        // Règle de temps selon la catégorie (Minime 2mn, Cadet/Junior 3mn, Senior 4mn)
+        const catLower = match.categorieID.toLowerCase();
+        if(catLower.includes("minime")) tempsReglementaire = 120;
+        else if(catLower.includes("cadet") || catLower.includes("junior")) tempsReglementaire = 180;
+        else tempsReglementaire = 240;
+
+        // Mise à jour de l'UI
+        document.getElementById('dash-info-match').textContent = `M#${match.matchNum} (T${match.round})`;
+        document.getElementById('dash-info-cat').textContent = match.categorieID.replace(/_/g, ' ');
+        document.getElementById('dash-info-clubs').textContent = `${combatDonneesInitiales.athleteBlanc.club} 🆚 ${combatDonneesInitiales.athleteBleu.club}`;
+
+        // On signale dans la base que le match est "En cours" (Pour l'arbre)
+        match.statut = "En cours";
+        await db.put(match);
+
+        reinitialiserTableDeMarque();
+      } catch (err) {
+        console.error("Erreur chargement match :", err);
+        document.getElementById('wait-subtext').textContent = "Match introuvable dans la base.";
+      }
+    }
+
+    // --- SAUVEGARDE & AVANCEMENT DANS L'ARBRE ---
+    async function cloreEtSauvegarderMatchDefinitif() {
+      if(!combatDonneesInitiales) return;
+      if(!combatDonneesInitiales.athleteBlanc.id || !combatDonneesInitiales.athleteBleu.id) {
+        return alert("Impossible de clôturer un combat sans les deux athlètes.");
+      }
+
+      if(!vainqueurDuMatch) {
+        if(matchScores.blanc.waza > matchScores.bleu.waza) vainqueurDuMatch = "blanc";
+        else if(matchScores.bleu.waza > matchScores.blanc.waza) vainqueurDuMatch = "bleu";
+        else {
+          vainqueurDuMatch = confirm("Égalité détectée. Cliquez sur OK pour déclarer BLANC vainqueur, ou Annuler pour BLEU.") ? "blanc" : "bleu";
+        }
+      }
+
+      const athleteVainqueur = vainqueurDuMatch === 'blanc' ? combatDonneesInitiales.athleteBlanc : combatDonneesInitiales.athleteBleu;
+
+      try {
+        const match = await db.get(combatDonneesInitiales.idMatch);
+
+        // Format IJF des scores pour l'affichage dans le journal (ex: "10s1 - 00")
+        const formatScore = (s) => {
+          let str = `${s.ippon}${s.waza}`;
+          if (s.shido > 0) str += `s${s.shido}`;
+          return str;
+        };
+
+        match.score1 = formatScore(matchScores.blanc);
+        match.score2 = formatScore(matchScores.bleu);
+        match.winnerId = athleteVainqueur.id;
+        match.statut = "Terminé";
+
+        await db.put(match);
+
+        // --- AVANCEMENT AUTOMATIQUE DANS L'ARBRE (Passage de Demi à Finale) ---
+        if (combatDonneesInitiales.round === 1) {
+          try {
+            // Le vainqueur du round 1 monte en Finale (Round 2, Match 1)
+            const nextMatchId = `match_${combatDonneesInitiales.categorieID}_R2_M1`;
+            const nextMatch = await db.get(nextMatchId);
+            
+            if (combatDonneesInitiales.matchNum === 1) {
+              nextMatch.athlete1 = athleteVainqueur;
+            } else if (combatDonneesInitiales.matchNum === 2) {
+              nextMatch.athlete2 = athleteVainqueur;
+            }
+            await db.put(nextMatch);
+          } catch(e) { console.log("Pas de finale correspondante trouvée."); }
+        }
+
+        canalBroadcast.postMessage({ tapis: tapisID, type: 'FORCE_RESET' });
+        
+        // Redirection vers le tableau
+        window.location.href = 'tirage.html';
+      } catch (err) {
+        console.error(err);
+        alert("Erreur lors de la sauvegarde du match dans l'arbre.");
+      }
+    }
+
+    // --- FONCTIONS DE CHRONO & TABLE DE MARQUE ---
+    function ouvrirEcranPublic() {
+      window.open(`combat.html?mode=public&tapis=${tapisID}`, `DojoControl_Projecteur_${tapisID}`, 'width=1280,height=720');
+      setTimeout(syncData, 400);
+    }
+
+    function toggleChrono() {
+      const btn = document.getElementById('btn-dash-chrono');
+      if (chronoInterval) {
+        clearInterval(chronoInterval); chronoInterval = null;
+        btn.textContent = "HAJIME (RELANCER)"; btn.style.background = "#378ADD";
+        syncData();
+      } else {
+        btn.textContent = "MATTE (PAUSE CHRONO)"; btn.style.background = "#EF4444";
+        chronoInterval = setInterval(() => {
+          if (!isGoldenScore) {
+            if (tempsRestant > 0) tempsRestant--;
+            else { clearInterval(chronoInterval); chronoInterval = null; evaluerFinDuTemps(); return; }
+          } else {
+            tempsRestant++;
+          }
+          syncData();
+        }, 1000);
+      }
+    }
+
+    function evaluerFinDuTemps() {
+      if (matchScores.blanc.waza > matchScores.bleu.waza) {
+        alert("Fin du temps réglementaire : Supériorité Blanc.");
+      } else if (matchScores.bleu.waza > matchScores.blanc.waza) {
+        alert("Fin du temps réglementaire : Supériorité Bleu.");
+      } else {
+        isGoldenScore = true;
+        tempsRestant = 0;
+        alert("⏱️ ÉGALITÉ : Lancement du Golden Score !");
+        toggleChrono();
+      }
+      syncData();
+    }
+
+    function modifierScore(couleur, type, valeur) {
+      pileHistoriqueGlobale.push(JSON.parse(JSON.stringify(matchScores)));
+      matchScores[couleur][type] += valeur;
+      if (matchScores[couleur].shido > 3) matchScores[couleur].shido = 3;
+      if (matchScores[couleur].shido < 0) matchScores[couleur].shido = 0;
+      analyserEtAvertirIntuitivement();
+      
+      // Auto Ippon Animation
+      if (type === 'ippon' && valeur > 0) {
+        const nom = (couleur === 'blanc') ? combatDonneesInitiales.athleteBlanc.nom : combatDonneesInitiales.athleteBleu.nom;
+        canalBroadcast.postMessage({ tapis: tapisID, type: 'TRIGGER_IPPON_ANIMATION', vainqueur: nom, couleur: couleur });
+        executerAnimationVisuelleDeuxSecondes(nom, couleur);
+      }
+      syncData();
+    }
+
+    function retirerDernierPointManuellement(couleur) {
+      pileHistoriqueGlobale.push(JSON.parse(JSON.stringify(matchScores)));
+      if(matchScores[couleur].waza > 0) matchScores[couleur].waza--;
+      else if(matchScores[couleur].shido > 0) matchScores[couleur].shido--;
+      else if(matchScores[couleur].ippon > 0) matchScores[couleur].ippon--;
+      analyserEtAvertirIntuitivement();
+      syncData();
+    }
+
+    function actionCorrectionGenerale() {
+      if (pileHistoriqueGlobale.length === 0) return;
+      matchScores = pileHistoriqueGlobale.pop();
+      analyserEtAvertirIntuitivement();
+      syncData();
+    }
+
+    function analyserEtAvertirIntuitivement() {
+      document.getElementById('alert-blanc').style.display = 'none';
+      document.getElementById('alert-bleu').style.display = 'none';
+      vainqueurDuMatch = "";
+
+      if (matchScores.blanc.waza >= 2 || matchScores.blanc.shido === 3 || matchScores.blanc.ippon >= 1) {
+        document.getElementById('alert-blanc').style.display = 'block';
+        vainqueurDuMatch = "blanc";
+      }
+      if (matchScores.bleu.waza >= 2 || matchScores.bleu.shido === 3 || matchScores.bleu.ippon >= 1) {
+        document.getElementById('alert-bleu').style.display = 'block';
+        vainqueurDuMatch = "bleu";
+      }
+    }
+
+    function executerAnimationVisuelleDeuxSecondes(nom, couleur) {
+      if (chronoInterval) toggleChrono(); 
+      const overlay = document.getElementById('pub-ippon-overlay');
+      document.getElementById('pub-ippon-winner-name').textContent = nom;
+
+      overlay.className = "ippon-overlay active"; 
+      if (couleur === 'blanc') overlay.classList.add('win-blanc');
+      if (couleur === 'bleu') overlay.classList.add('win-bleu');
+      setTimeout(() => { overlay.classList.remove('active'); }, 2000);
+    }
+
+    function reinitialiserTableDeMarque() {
+      matchScores = { blanc: { ippon: 0, waza: 0, shido: 0 }, bleu: { ippon: 0, waza: 0, shido: 0 } };
+      isGoldenScore = false;
+      tempsRestant = tempsReglementaire;
+      pileHistoriqueGlobale = [];
+      analyserEtAvertirIntuitivement();
+      syncData();
+    }
+
+    // --- SYNCHRO ECRAN PUBLIC ---
+    function syncData() {
+      if(!combatDonneesInitiales) return;
+
+      const structurePack = {
+        rubrique: combatDonneesInitiales.categorieID.replace(/_/g, ' '),
+        athleteBlanc: combatDonneesInitiales.athleteBlanc,
+        athleteBleu: combatDonneesInitiales.athleteBleu,
+        scores: matchScores,
+        tempsRestant: tempsRestant,
+        isGoldenScore: isGoldenScore,
+        chronoActif: (chronoInterval !== null)
+      };
+
+      if (!estEcranPublicUniquement) {
+        canalBroadcast.postMessage({ tapis: tapisID, type: 'REFRESH_SCREEN', payload: structurePack });
+        genererRenduVisuelPublic(structurePack);
+      }
+    }
+
+    function genererRenduVisuelPublic(p) {
+      document.getElementById('pub-view-rubrique').textContent = p.rubrique;
+      
+      document.getElementById('pub-name-blanc').textContent = p.athleteBlanc.nom;
+      document.getElementById('pub-club-blanc').textContent = p.athleteBlanc.club || "---";
+      document.getElementById('pub-abbr-blanc').textContent = p.athleteBlanc.abbr || "IND";
+      document.getElementById('dash-lbl-blanc').textContent = p.athleteBlanc.nom;
+
+      document.getElementById('pub-name-bleu').textContent = p.athleteBleu.nom;
+      document.getElementById('pub-club-bleu').textContent = p.athleteBleu.club || "---";
+      document.getElementById('pub-abbr-bleu').textContent = p.athleteBleu.abbr || "IND";
+      document.getElementById('dash-lbl-bleu').textContent = p.athleteBleu.nom;
+
+      document.getElementById('pub-ippon-blanc').textContent = p.scores.blanc.ippon;
+      document.getElementById('pub-waza-blanc').textContent = p.scores.blanc.waza;
+      document.getElementById('pub-ippon-bleu').textContent = p.scores.bleu.ippon;
+      document.getElementById('pub-waza-bleu').textContent = p.scores.bleu.waza;
+
+      gestionnaireRenduCartonsFij('blanc', p.scores.blanc.shido);
+      gestionnaireRenduCartonsFij('bleu', p.scores.bleu.shido);
+
+      const m = Math.floor(p.tempsRestant / 60).toString().padStart(2, '0');
+      const s = (p.tempsRestant % 60).toString().padStart(2, '0');
+      const timer = document.getElementById('pub-view-chrono');
+      timer.textContent = `${m}:${s}`;
+      
+      if (!p.chronoActif) timer.classList.add('paused');
+      else timer.classList.remove('paused');
+
+      if (p.isGoldenScore) {
+        timer.classList.add('golden-score');
+        document.getElementById('pub-view-gs-label').style.display = 'block';
+      } else {
+        timer.classList.remove('golden-score');
+        document.getElementById('pub-view-gs-label').style.display = 'none';
+      }
+    }
+
+    function gestionnaireRenduCartonsFij(couleur, nbrShido) {
+      for(let i=1; i<=3; i++) {
+        const c = document.getElementById(`card-${couleur}-${i}`);
+        c.className = "shido-card-ijf";
+        if(i <= nbrShido) {
+          if(i === 3) c.classList.add('red-card');
+          else c.classList.add('yellow-card');
+        }
+      }
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (estEcranPublicUniquement) return;
+      if (e.code === 'Space') { e.preventDefault(); toggleChrono(); }
+    });
+  </script>
+</body>
+</html>

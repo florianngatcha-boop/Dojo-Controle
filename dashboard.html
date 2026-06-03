@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DojoControl — Dashboard Central & Tables de Marque</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+  <style>
+    :root {
+      --color-primary: #1B365D; --color-accent: #378ADD;
+      --color-bg: #EBF1F6; --color-card: #FFFFFF; --color-text: #2C3E50;
+      --color-border: #D1DBE5; --color-white: #FFFFFF; --color-blue-judo: #2563EB;
+      --color-success: #1D9E75; --color-danger: #E24B4A; --border-radius: 14px;
+    }
+    * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+    body { background-color: var(--color-bg); color: var(--color-text); margin: 0; padding: 1.5rem; height: 100vh; overflow: hidden; }
+    
+    .dashboard-container { max-width: 1600px; margin: 0 auto; display: flex; flex-direction: column; height: calc(100vh - 3rem); }
+    
+    header { display: flex; justify-content: space-between; align-items: center; background: var(--color-primary); color: white; padding: 1rem 2rem; border-radius: var(--border-radius); margin-bottom: 1.5rem; box-shadow: 0 4px 10px rgba(0,0,0,0.08); }
+    header h1 { margin: 0; font-size: 22px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+    header p { margin: 2px 0 0 0; color: #93C5FD; font-size: 12px; }
+
+    .tapis-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; flex-grow: 1; min-height: 0; overflow-y: auto; padding-bottom: 10px; }
+    
+    .tapis-card { background: var(--color-card); border: 2px solid var(--color-border); border-radius: var(--border-radius); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
+    .tapis-header { background: #F1F5F9; border-bottom: 2px solid var(--color-border); padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; }
+    .tapis-title { margin: 0; font-size: 16px; font-weight: 700; color: var(--color-primary); }
+    .tapis-badge { background: var(--color-accent); color: white; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: bold; }
+    
+    .tapis-body { padding: 15px; flex-grow: 1; display: flex; flex-direction: column; justify-content: space-between; }
+    
+    .chrono-display { font-size: 42px; font-family: monospace; font-weight: bold; text-align: center; color: #1E293B; background: #F8FAFC; border: 1px solid var(--color-border); padding: 5px 0; border-radius: 8px; margin-bottom: 15px; letter-spacing: 1px; }
+    
+    .fighters-versus { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
+    .fighter-box { padding: 12px; border-radius: 8px; border: 1px solid var(--color-border); position: relative; }
+    .fighter-box.blanc { border-left: 8px solid #CBD5E1; background: #F8FAFC; }
+    .fighter-box.bleu { border-left: 8px solid var(--color-blue-judo); background: #EFF6FF; }
+    
+    .fighter-name { font-weight: 700; font-size: 14px; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 180px; }
+    .fighter-club { font-size: 11px; color: #64748B; margin: 2px 0 0 0; }
+    
+    .score-controls { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); display: flex; gap: 6px; z-index: 10; }
+    .score-badge { font-weight: 800; font-size: 13px; padding: 6px 10px; border-radius: 6px; min-width: 32px; text-align: center; border: 1px solid #CBD5E1; background: white; cursor: pointer; user-select: none; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .score-badge:hover { filter: brightness(0.95); transform: translateY(-1px); }
+    .score-badge.shido { color: var(--color-danger); border-color: #FCA5A5; }
+    .score-badge.active-pts { background: var(--color-primary); color: white; border-color: var(--color-primary); }
+    .score-badge.active-shido { background: var(--color-danger); color: white; border-color: var(--color-danger); }
+
+    .tapis-footer { display: flex; gap: 8px; border-top: 1px solid var(--color-border); padding-top: 12px; }
+    .btn { flex: 1; padding: 10px; border-radius: 6px; border: none; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 4px; transition: background 0.2s; }
+    .btn-play { background: var(--color-success); color: white; }
+    .btn-pause { background: var(--color-warning); color: white; }
+    .btn-stop { background: #64748B; color: white; }
+    
+    .empty-tapis { text-align: center; padding: 40px 20px; color: #94A3B8; font-size: 13px; font-weight: 500; border: 2px dashed #CBD5E1; border-radius: 8px; margin: auto 0; }
+    .empty-tapis i { font-size: 36px; display: block; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+
+<div class="dashboard-container">
+  <header>
+    <div>
+      <h1><i class="ti ti-layout-dashboard"></i> DojoControl — Supervision Générale des Tapis</h1>
+      <p>Aiguillage et arbitrage en direct du Festival de Judo de Maroua 2026</p>
+    </div>
+    <div>
+      <button class="btn" style="background:#475569; color:white; padding:10px 16px;" onclick="importerLesCombats()"><i class="ti ti-download"></i> Injecter la file des combats</button>
+    </div>
+  </header>
+
+  <div class="tapis-grid" id="tapis-container">
+    <div class="tapis-card" id="tapis-1">
+      <div class="tapis-header">
+        <h3 class="tapis-title">🥋 SURFACE DE COMBAT 1</h3>
+        <span class="tapis-badge" id="tapis-1-cat">En attente</span>
+      </div>
+      <div class="tapis-body" id="tapis-1-body">
+         <div class="empty-tapis"><i class="ti ti-hourglass"></i>Aucun combat affecté à ce tapis.</div>
+      </div>
+    </div>
+
+    <div class="tapis-card" id="tapis-2">
+      <div class="tapis-header">
+        <h3 class="tapis-title">🥋 SURFACE DE COMBAT 2</h3>
+        <span class="tapis-badge" id="tapis-2-cat">En attente</span>
+      </div>
+      <div class="tapis-body" id="tapis-2-body">
+         <div class="empty-tapis"><i class="ti ti-hourglass"></i>Aucun combat affecté à ce tapis.</div>
+      </div>
+    </div>
+
+    <div class="tapis-card" id="tapis-3">
+      <div class="tapis-header">
+        <h3 class="tapis-title">🥋 SURFACE DE COMBAT 3</h3>
+        <span class="tapis-badge" id="tapis-3-cat">En attente</span>
+      </div>
+      <div class="tapis-body" id="tapis-3-body">
+         <div class="empty-tapis"><i class="ti ti-hourglass"></i>Aucun combat affecté à ce tapis.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let fileAttenteGlobale = [];
+  
+  let etatTapis = {
+    1: { chrono: 240, running: false, timer: null, blanc: { ippon: 0, waza: 0, shido: 0 }, bleu: { ippon: 0, waza: 0, shido: 0 }, combatData: null },
+    2: { chrono: 240, running: false, timer: null, blanc: { ippon: 0, waza: 0, shido: 0 }, bleu: { ippon: 0, waza: 0, shido: 0 }, combatData: null },
+    3: { chrono: 240, running: false, timer: null, blanc: { ippon: 0, waza: 0, shido: 0 }, bleu: { ippon: 0, waza: 0, shido: 0 }, combatData: null }
+  };
+
+  // TRANSMISSION EN DIRECT VERS L'ÉCRAN SPECTATEUR
+  function synchroniserLive(idTapis) {
+    const t = etatTapis[idTapis];
+    const paquet = {
+      actif: t.combatData ? true : false,
+      categorie: t.combatData ? t.combatData.categorie : "",
+      chrono: t.chrono,
+      blanc: t.blanc,
+      bleu: t.bleu,
+      athleteBlanc: t.combatData ? t.combatData.blanc : null,
+      athleteBleu: t.combatData ? t.combatData.bleu : null
+    };
+    localStorage.setItem(`dojocontrol_live_tapis_${idTapis}`, JSON.stringify(paquet));
+  }
+
+  function importerLesCombats() {
+    fileAttenteGlobale = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const cle = localStorage.key(i);
+      if (cle.startsWith('combats_actifs_')) {
+        const catID = cle.replace('combats_actifs_', '').replace(/_/g, " ");
+        const liste = JSON.parse(localStorage.getItem(cle)) || [];
+        liste.forEach(c => {
+          if(c.bleu && c.bleu.nom !== "EXEMPT (BYE)") {
+            fileAttenteGlobale.push({ ...c, categorie: catID });
+          }
+        });
+      }
+    }
+    if(fileAttenteGlobale.length === 0) {
+      alert("⚠️ Aucun tirage au sort actif trouvé !");
+      return;
+    }
+    distribuerCombatsSurTapisVides();
+  }
+
+  function distribuerCombatsSurTapisVides() {
+    for (let idTapis = 1; idTapis <= 3; idTapis++) {
+      if (!etatTapis[idTapis].combatData && fileAttenteGlobale.length > 0) {
+        etatTapis[idTapis].combatData = fileAttenteGlobale.shift();
+        etatTapis[idTapis].chrono = 240; 
+        etatTapis[idTapis].blanc = { ippon: 0, waza: 0, shido: 0 };
+        etatTapis[idTapis].bleu = { ippon: 0, waza: 0, shido: 0 };
+        
+        dessinerTableDeMarque(idTapis);
+        synchroniserLive(idTapis);
+      }
+    }
+  }
+
+  function dessinerTableDeMarque(id) {
+    const tapisBody = document.getElementById(`tapis-${id}-body`);
+    const tapisBadge = document.getElementById(`tapis-${id}-cat`);
+    const t = etatTapis[id];
+
+    if (!t.combatData) {
+      tapisBadge.textContent = "En attente";
+      tapisBody.innerHTML = `<div class="empty-tapis"><i class="ti ti-hourglass"></i>Aucun combat en cours.</div>`;
+      return;
+    }
+
+    tapisBadge.textContent = t.combatData.categorie;
+    const m = Math.floor(t.chrono / 60).toString().padStart(2, '0');
+    const s = (t.chrono % 60).toString().padStart(2, '0');
+
+    tapisBody.innerHTML = `
+      <div class="chrono-display" id="chrono-${id}">${m}:${s}</div>
+      <div class="fighters-versus">
+        <div class="fighter-box blanc">
+          <p class="fighter-name">${t.combatData.blanc.nom}</p>
+          <p class="fighter-club">${t.combatData.blanc.club}</p>
+          <div class="score-controls">
+            <div class="score-badge ${t.blanc.ippon ? 'active-pts' : ''}" onclick="ajouterPoint(${id}, 'blanc', 'ippon')">I</div>
+            <div class="score-badge ${t.blanc.waza ? 'active-pts' : ''}" onclick="ajouterPoint(${id}, 'blanc', 'waza')">W</div>
+            <div class="score-badge shido ${t.blanc.shido > 0 ? 'active-shido' : ''}" onclick="ajouterPoint(${id}, 'blanc', 'shido')">S:${t.blanc.shido}</div>
+          </div>
+        </div>
+        <div class="fighter-box bleu">
+          <p class="fighter-name">${t.combatData.bleu.nom}</p>
+          <p class="fighter-club">${t.combatData.bleu.club}</p>
+          <div class="score-controls">
+            <div class="score-badge ${t.bleu.ippon ? 'active-pts' : ''}" onclick="ajouterPoint(${id}, 'bleu', 'ippon')">I</div>
+            <div class="score-badge ${t.bleu.waza ? 'active-pts' : ''}" onclick="ajouterPoint(${id}, 'bleu', 'waza')">W</div>
+            <div class="score-badge shido ${t.bleu.shido > 0 ? 'active-shido' : ''}" onclick="ajouterPoint(${id}, 'bleu', 'shido')">S:${t.bleu.shido}</div>
+          </div>
+        </div>
+      </div>
+      <div class="tapis-footer">
+        ${t.running ? 
+          `<button class="btn btn-pause" onclick="toggleChrono(${id})"><i class="ti ti-pause"></i> PAUSE</button>` : 
+          `<button class="btn btn-play" onclick="toggleChrono(${id})"><i class="ti ti-play"></i> DÉMARRER</button>`
+        }
+        <button class="btn btn-stop" onclick="cloreCombatManuellement(${id})"><i class="ti ti-gavel"></i> FINISH</button>
+      </div>
+    `;
+  }
+
+  function toggleChrono(id) {
+    const t = etatTapis[id];
+    if (t.running) {
+      t.running = false;
+      clearInterval(t.timer);
+      synchroniserLive(id);
+    } else {
+      t.running = true;
+      t.timer = setInterval(() => {
+        if (t.chrono > 0) {
+          t.chrono--;
+          const m = Math.floor(t.chrono / 60).toString().padStart(2, '0');
+          const s = (t.chrono % 60).toString().padStart(2, '0');
+          const chronoEl = document.getElementById(`chrono-${id}`);
+          if(chronoEl) chronoEl.textContent = `${m}:${s}`;
+          synchroniserLive(id);
+        } else {
+          clearInterval(t.timer);
+          t.running = false;
+          alert(`🔔 Fin du temps réglementaire sur le Tapis ${id} !`);
+          cloreCombatManuellement(id);
+        }
+      }, 1000);
+    }
+    dessinerTableDeMarque(id);
+  }
+
+  function ajouterPoint(idTapis, combattant, type) {
+    const t = etatTapis[idTapis];
+    if(type === 'ippon') {
+      t[combattant].ippon = t[combattant].ippon === 1 ? 0 : 1;
+      if(t[combattant].ippon === 1) {
+        synchronLiveAndEnd(idTapis, combattant, `🔥 IPPON pour ${combattant.toUpperCase()} !`);
+        return;
+      }
+    } else if(type === 'waza') {
+      t[combattant].waza = t[combattant].waza === 1 ? 0 : 1;
+    } else if(type === 'shido') {
+      t[combattant].shido++;
+      if(t[combattant].shido >= 3) {
+        const adv = combattant === 'blanc' ? 'bleu' : 'blanc';
+        synchronLiveAndEnd(idTapis, adv, `🔴 3 Shidos pour ${combattant.toUpperCase()} !`);
+        return;
+      }
+    }
+    dessinerTableDeMarque(idTapis);
+    synchroniserLive(idTapis);
+  }
+
+  function synchronLiveAndEnd(id, gagneur, texte) {
+    synchroniserLive(id);
+    setTimeout(() => { alert(texte); cloreCombatManuellement(id, gagneur); }, 50);
+  }
+
+  function cloreCombatManuellement(idTapis, vainqueurForce = null) {
+    const t = etatTapis[idTapis];
+    clearInterval(t.timer);
+    t.running = false;
+    let vainqueur = vainqueurForce;
+    if (!vainqueur) {
+      if (t.blanc.ippon > t.bleu.ippon) vainqueur = 'blanc';
+      else if (t.bleu.ippon > t.blanc.ippon) vainqueur = 'bleu';
+      else if (t.blanc.waza > t.bleu.waza) vainqueur = 'blanc';
+      else if (t.bleu.waza > t.blanc.waza) vainqueur = 'bleu';
+      else if (t.blanc.shido < t.bleu.shido) vainqueur = 'blanc'; 
+      else if (t.bleu.shido < t.blanc.shido) vainqueur = 'bleu';
+      else { vainqueur = confirm("Égalité ? OK = BLANC, ANNULER = BLEU") ? 'blanc' : 'bleu'; }
+    }
+    const nomVainqueur = vainqueur === 'blanc' ? t.combatData.blanc.nom : t.combatData.bleu.nom;
+    alert(`🏆 Vainqueur Tapis ${idTapis} : ${nomVainqueur}`);
+    
+    let hist = JSON.parse(localStorage.getItem('dojocontrol_resultats')) || [];
+    hist.push({ categorie: t.combatData.categorie, blanc: t.combatData.blanc, bleu: t.combatData.bleu, scores: { blanc: t.blanc, bleu: t.bleu }, vainqueur: nomVainqueur });
+    localStorage.setItem('dojocontrol_resultats', JSON.stringify(hist));
+
+    etatTapis[idTapis].combatData = null;
+    distribuerCombatsSurTapisVides();
+    dessinerTableDeMarque(idTapis);
+    synchroniserLive(idTapis);
+  }
+
+  window.onload = () => { importerLesCombats(); };
+</script>
+</body>
+</html>

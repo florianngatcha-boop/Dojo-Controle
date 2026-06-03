@@ -1,0 +1,6 @@
+firstName,lastName,birthDate,email,phone,club,weight,category,belt
+Jean,Dupont,1995-05-15,jean.dupont@email.com,+33612345678,Club Judo Paris,85,Sénior,Marron
+Marie,Martin,2010-03-22,marie.martin@email.com,+33698765432,Club Judo Lyon,65,U14,Orange
+Pierre,Durand,2008-07-10,pierre.durand@email.com,+33645123456,Club Judo Marseille,72,U16,Verte
+Sophie,Lefebvre,2012-11-05,sophie.lefebvre@email.com,+33687654321,Club Judo Toulouse,58,U12,Jaune
+Luc,Moreau,1998-01-20,luc.moreau@email.com,+33634567890,Club Judo Bordeaux,95,Sénior,Noire

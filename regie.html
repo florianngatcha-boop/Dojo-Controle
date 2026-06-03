@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DojoControl - Console de Régie IJF</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/pouchdb@8.0.1/dist/pouchdb.min.js"></script>
+  <style>
+    :root { --bg: #0F172A; --card: #1E293B; --border: #334155; --accent: #3b82f6; --success: #10b981; }
+    * { box-sizing: border-box; font-family: sans-serif; }
+    body { background-color: var(--bg); color: #F8FAFC; margin: 0; padding: 0; }
+    .navbar { background: #1E293B; padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; }
+    .container { max-width: 750px; margin: 2rem auto; padding: 0 1rem; }
+    select { width: 100%; padding: 12px; border-radius: 6px; background: #0F172A; color: white; border: 1px solid var(--border); font-weight: bold; margin-bottom: 2rem; }
+    .match-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+    .vs-row { display: flex; justify-content: space-between; align-items: center; margin: 15px 0; }
+    .fighter-side { flex: 1; background: #0F172A; padding: 12px; border-radius: 6px; text-align: center; }
+    .score-field { width: 80px; padding: 6px; text-align: center; font-weight: bold; font-size: 16px; background: var(--card); color: white; border: 1px solid var(--border); border-radius: 4px; margin-top: 8px; }
+    .btn-submit { width: 100%; background: var(--success); color: white; border: none; padding: 11px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <h2><i class="ti ti-device-gamepad-2"></i> Console d'Arbitrage — Tables Connectées</h2>
+  <span style="color:var(--success); font-weight:bold; font-size:13px;"><i class="ti ti-plug"></i> LIVE SCRIPT</span>
+</nav>
+
+<div class="container">
+  <select id="regie-selector" onchange="chargerFeuilleMatchIJF()">
+    <option value="">-- Sélectionner la catégorie active --</option>
+  </select>
+  <div id="matches-container"></div>
+</div>
+
+<script>
+  const db = new PouchDB('dojocontrol_db');
+  let docArbreActuel = null;
+
+  async function listerPoulesIJF() {
+    try {
+      const res = await db.allDocs({ include_docs: true, startkey: 'arbre_', endkey: 'arbre_\uffff' });
+      const sel = document.getElementById('regie-selector');
+      sel.innerHTML = '<option value="">-- Sélectionner la catégorie active --</option>';
+      res.rows.forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r.doc._id; opt.textContent = r.doc.categorieID.replace(/_/g, ' • ');
+        sel.appendChild(opt);
+      });
+    } catch(e) { console.error(e); }
+  }
+
+  async function chargerFeuilleMatchIJF() {
+    const id = document.getElementById('regie-selector').value;
+    if(!id) return;
+    try { docArbreActuel = await db.get(id); renderRegieMatchesIJF(); } catch(e) { console.error(e); }
+  }
+
+  function renderRegieMatchesIJF() {
+    const container = document.getElementById('matches-container');
+    container.innerHTML = "";
+    const m = docArbreActuel.matches;
+
+    Object.keys(m).forEach(key => {
+      // Masquer les combats dont les combattants ne sont pas encore définis (ou exempts)
+      if(m[key].ath1.nom.includes("Winner") || m[key].ath2.nom.includes("Winner") || m[key].ath1.nom === "EXEMPT" || m[key].ath2.nom === "EXEMPT" || m[key].ath1.nom.includes("Perdant")) return;
+
+      container.innerHTML += `
+        <div class="match-card">
+          <div style="font-size:11px; color:#94A3B8; font-weight:bold;">ID MATCH : ${key} ${m[key].fini ? '✅ VALIDÉ' : '⏳ EN COURS'}</div>
+          <div class="vs-row">
+            <div class="fighter-side">
+              <div style="font-weight:bold; text-transform:uppercase;">⚪ ${m[key].ath1.nom} ${m[key].ath1.prenom}</div>
+              <input type="number" id="s1-${key}" class="score-field" value="${m[key].score1 || 0}">
+            </div>
+            <div style="font-weight:900; padding:0 10px;">VS</div>
+            <div class="fighter-side">
+              <div style="font-weight:bold; text-transform:uppercase;">🔵 ${m[key].ath2.nom} ${m[key].ath2.prenom}</div>
+              <input type="number" id="s2-${key}" class="score-field" value="${m[key].score2 || 0}">
+            </div>
+          </div>
+          <button class="btn-submit" onclick="validerScoreIJF('${key}')"><i class="ti ti-check"></i> Enregistrer et Propager</button>
+        </div>`;
+    });
+  }
+
+  async function validerScoreIJF(matchKey) {
+    const sc1 = parseInt(document.getElementById(`s1-${matchKey}`).value) || 0;
+    const sc2 = parseInt(document.getElementById(`s2-${matchKey}`).value) || 0;
+    if(sc1 === sc2) return alert("Veuillez désigner un vainqueur.");
+
+    const is1Winner = sc1 > sc2;
+    const gagnant = is1Winner ? docArbreActuel.matches[matchKey].ath1 : docArbreActuel.matches[matchKey].ath2;
+    const perdant = is1Winner ? docArbreActuel.matches[matchKey].ath2 : docArbreActuel.matches[matchKey].ath1;
+
+    docArbreActuel.matches[matchKey].score1 = sc1;
+    docArbreActuel.matches[matchKey].score2 = sc2;
+    docArbreActuel.matches[matchKey].fini = true;
+    docArbreActuel.matches[matchKey].gagnant = gagnant;
+
+    // ALGORITHME DE ROUTAGE DIRECT ET REPECHAGE
+    const routage = {
+      'R1-M1': { next: 'R2-M1', slot: 'ath1', rep: 'REP-M1', repSlot: 'ath1' },
+      'R1-M2': { next: 'R2-M1', slot: 'ath2', rep: 'REP-M1', repSlot: 'ath2' },
+      'R1-M3': { next: 'R2-M2', slot: 'ath1', rep: 'REP-M2', repSlot: 'ath1' },
+      'R1-M4': { next: 'R2-M2', slot: 'ath2', rep: 'REP-M2', repSlot: 'ath2' },
+      'R2-M1': { next: 'R3-M1', slot: 'ath1' },
+      'R2-M2': { next: 'R3-M1', slot: 'ath2' }
+    };
+
+    const route = routage[matchKey];
+    if(route) {
+      docArbreActuel.matches[route.next][route.slot] = gagnant;
+      // Envoi automatique des perdants des Quarts vers le tableau de repêchage
+      if(route.rep) {
+        docArbreActuel.matches[route.rep][route.repSlot] = perdant;
+      }
+    }
+
+    try {
+      const live = await db.get(docArbreActuel._id); docArbreActuel._rev = live._rev;
+      await db.put(docArbreActuel);
+      chargerFeuilleMatchIJF();
+    } catch(e) { console.error(e); }
+  }
+
+  window.onload = listerPoulesIJF;
+</script>
+</body>
+</html>
